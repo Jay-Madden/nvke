@@ -717,6 +717,7 @@ func dockerMachineTemplate() map[string]any {
 	}
 }
 
+//nolint:unparam // Preserve the error contract while class resolution is hardcoded.
 func resolveNVKEControllerClass(class internalv1.ResourceName, request *api.CreateClusterRequest) error {
 	_ = class
 	request.ControlPlaneKubernetesVersion = "1.36.1"
