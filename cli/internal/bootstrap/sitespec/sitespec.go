@@ -260,6 +260,7 @@ type OIDCProvider struct {
 	GroupsPrefix   string            `yaml:"groupsPrefix,omitempty"`
 	RequiredClaims map[string]string `yaml:"requiredClaims,omitempty"`
 	CABundle       string            `yaml:"caBundle"`
+	DiscoveryURL   string            `yaml:"discoveryURL,omitempty"`
 }
 
 // EtcdEncryptionEnabled reports whether the cluster's etcd data is encrypted
@@ -705,6 +706,7 @@ func (v *validator) checkNode(path string, n Node, names, ips map[string]int) {
 	}
 }
 
+// checkOIDCProviders records invalid provider settings and duplicate names or URLs.
 func (v *validator) checkOIDCProviders(c Cluster) {
 	if len(c.OIDCProviders) == 0 {
 		return
@@ -718,6 +720,7 @@ func (v *validator) checkOIDCProviders(c Cluster) {
 
 	seenNames := map[string]int{}
 	seenIssuers := map[string]int{}
+	seenDiscoveryURLs := map[string]int{}
 	for i, p := range c.OIDCProviders {
 		path := fmt.Sprintf("%s[%d]", pathOIDCProviders, i)
 		name := strings.TrimSpace(p.Name)
@@ -741,6 +744,14 @@ func (v *validator) checkOIDCProviders(c Cluster) {
 				seenIssuers[issuerURL] = i
 			}
 		}
+		if p.DiscoveryURL != "" {
+			v.checkOIDCDiscoveryURL(path+".discoveryURL", issuerURL, p.DiscoveryURL)
+			if prev, dup := seenDiscoveryURLs[p.DiscoveryURL]; dup {
+				v.addf("%s.discoveryURL %q is already used by %s[%d]", path, p.DiscoveryURL, pathOIDCProviders, prev)
+			} else {
+				seenDiscoveryURLs[p.DiscoveryURL] = i
+			}
+		}
 		if strings.TrimSpace(p.UsernameClaim) == "" {
 			v.addf("%s.usernameClaim is required", path)
 		}
@@ -762,6 +773,36 @@ func (v *validator) checkOIDCProviders(c Cluster) {
 		} else if _, err := cert.ParseCertsPEM([]byte(p.CABundle)); err != nil {
 			v.addf("%s.caBundle must contain a PEM-encoded certificate", path)
 		}
+	}
+}
+
+// checkOIDCDiscoveryURL records discovery overrides that cannot be used by kube-apiserver.
+func (v *validator) checkOIDCDiscoveryURL(path, issuerURL, discoveryURL string) {
+	if strings.TrimSpace(discoveryURL) != discoveryURL {
+		v.addf("%s must not contain leading or trailing whitespace", path)
+		return
+	}
+	u, err := url.Parse(discoveryURL)
+	if err != nil {
+		v.addf("%s %q is not a URL: %v", path, discoveryURL, err)
+		return
+	}
+	if port := u.Port(); port != "" {
+		n, err := strconv.Atoi(port)
+		if err != nil || n < 1 || n > 65535 {
+			v.addf("%s port %q must be between 1 and 65535", path, port)
+			return
+		}
+	}
+	switch {
+	case u.Scheme != "https" || u.Hostname() == "":
+		v.addf("%s %q must be an absolute https URL", path, discoveryURL)
+	case u.User != nil:
+		v.addf("%s must not contain a username or password", path)
+	case u.RawQuery != "" || u.Fragment != "":
+		v.addf("%s %q must not contain a query or fragment", path, discoveryURL)
+	case strings.TrimRight(discoveryURL, "/") == strings.TrimRight(issuerURL, "/"):
+		v.addf("%s %q must differ from issuerURL; leave it unset to use the issuer's own discovery document", path, discoveryURL)
 	}
 }
 
