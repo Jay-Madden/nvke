@@ -29,6 +29,7 @@ type requestRecord struct {
 	Path           string                     `json:"path"`
 	Create         *api.CreateClusterRequest  `json:"create,omitempty"`
 	CreateNodePool *api.CreateNodePoolRequest `json:"createNodePool,omitempty"`
+	UpdateNodePool *api.UpdateNodePoolRequest `json:"updateNodePool,omitempty"`
 }
 
 type nodePoolSeed struct {
@@ -76,6 +77,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/nodePools", handle(s, &s.nodePools, s.listNodePools))
 	mux.HandleFunc("GET /api/nodePools/{nodePoolID}", handle(s, &s.nodePools, s.getNodePool))
 	mux.HandleFunc("POST /api/nodePools", handle(s, &s.nodePools, s.createNodePool))
+	mux.HandleFunc("PATCH /api/nodePools/{nodePoolID}", handle(s, &s.nodePools, s.updateNodePool))
 	return mux
 }
 
@@ -322,6 +324,28 @@ func (s *Server) createNodePool(w http.ResponseWriter, r *http.Request) {
 	}
 	s.nodePools.Resources[pool.ID] = pool
 	writeJSON(w, http.StatusCreated, pool)
+}
+
+func (s *Server) updateNodePool(w http.ResponseWriter, r *http.Request) {
+	var request api.UpdateNodePoolRequest
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&request); err != nil || request.DesiredNodeCount == nil || *request.DesiredNodeCount < 0 {
+		writeError(w, http.StatusBadRequest, "invalid node pool scale request")
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.requests = append(s.requests, requestRecord{Method: r.Method, Path: r.URL.Path, UpdateNodePool: &request})
+	id, err := uuid.Parse(r.PathValue("nodePoolID"))
+	pool, exists := s.nodePools.Resources[id]
+	if err != nil || !exists {
+		writeError(w, http.StatusNotFound, "node pool not found")
+		return
+	}
+	pool.DesiredNodeCount = *request.DesiredNodeCount
+	s.nodePools.Resources[id] = pool
+	writeJSON(w, http.StatusOK, pool)
 }
 
 func (s *Server) deleteCluster(w http.ResponseWriter, r *http.Request) {
