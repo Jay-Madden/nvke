@@ -108,9 +108,9 @@ artifacts on GHCR. Unset, it means
 component but `os-image`, whose qcow2s go to NVCR and S3 only. Set it to `none`
 to stop every GitHub publication, or list the components you want. NVCR, S3 and
 CloudFront are not affected, and neither is the CI hand-off on GHCR: the `sha-`
-and `edge` aliases of `agent` and `cli` and the `sha-` tagged qcow2s of
-`os-image` keep flowing, because `agent/Makefile`, the NVCR and S3 publishers
-and the NICo VMs lane read them. Only the version-tagged aliases, the GitHub
+and `edge` aliases of `agent` and `cli` and the `sha-` and `main-sha-` tagged
+qcow2s of `os-image` keep flowing, because `agent/Makefile`, the NVCR and S3
+publishers and the NICo VMs lane read them. Only the version-tagged aliases, the GitHub
 Releases and their attestations stop. The variable must be a repository or
 organization variable; an environment variable is not visible to the job
 conditions. With `os-image` off, each leg's SBOM, checksums file and the
@@ -124,7 +124,7 @@ names, comma-separated with no spaces:
 | Name | Tag | What GitHub gets when the name is listed |
 |---|---|---|
 | `root` | bare `vX.Y.Z` | the GitHub Release with the product manifest and SBOM |
-| `controller` | `controller/v*` | the GitHub Release, `nke-controller` image and chart on GHCR |
+| `controller` | `controller/v*` | the GitHub Release, the `nke-controller` image and the `charts/nvke-controller` chart on GHCR |
 | `cli` | `cli/v*` | the GitHub Release with the binaries, `cli` binaries on GHCR |
 | `agent` | `agent/v*` | the GitHub Release with the `.deb`s, `agent` and `agent-deb` on GHCR |
 | `cluster-api-provider-provisioned` | `cluster-api-provider-provisioned/v*` | the provider image on GHCR |
@@ -134,9 +134,9 @@ names, comma-separated with no spaces:
 An `os-image/` tag that fails Packer or the boot-smoke test never publishes the
 OCI artifact and never promotes the GitHub Release out of draft.
 
-An `nktp/` tag releases the NVKE telemetry pipelines (NKTP) Helm chart. The chart version is the tag's:
+An `nktp/` tag releases the NVKE telemetry pipeline (NKTP) Helm chart. The chart version is the tag's:
 `nktp/vX.Y.Z` packages the chart as `X.Y.Z` and `nktp/vX.Y.Z-rc.1` as
-`X.Y.Z-rc.1`, the way the controller chart takes its version from
+`X.Y.Z-rc.1`, the way the NVKE controller chart takes its version from
 `controller/v*`. `version:` in `nktp/deploy/charts/nktp/Chart.yaml` is a
 placeholder, so nothing needs editing before tagging. The workflow pushes
 `oci://ghcr.io/dsx-ai-factory/nvke/charts/nktp:<version>` and writes the release
@@ -148,7 +148,7 @@ additionally publishes the controller image and Helm chart:
 | Workflow | What it publishes |
 |---|---|
 | `image-nvcr.yml` | multi-arch image to `nvcr.io/<org>/nvke-controller`, promotes that released image to DSX as `nvcr.io/<dsx-org-team>/nvke-controller`, and promotes release tags to `ghcr.io/dsx-ai-factory/nvke/nke-controller` |
-| `chart-publish.yml` | chart to `ghcr.io/dsx-ai-factory/nvke/charts/nke-controller` |
+| `chart-publish.yml` | chart to `ghcr.io/dsx-ai-factory/nvke/charts/nvke-controller` |
 | `chart-publish-nvcr.yml` | chart to `nvcr.io/<org>/nvke-controller-chart` and `nvcr.io/<dsx-org-team>/nvke-controller-chart` |
 
 Every `main` commit already publishes the image and chart to NVCR. GHCR receives
@@ -282,7 +282,7 @@ what a build of this commit ought to select.
 | `nke-controller` image | `controller-sbom-linux-<arch>.spdx.json` | image contents, scanned from the pushed image | workflow artifact on the **Image NVCR** run |
 | `cluster-api-provider-provisioned` image | `cluster-api-provider-provisioned-sbom-linux-<arch>.spdx.json` | image contents, scanned from the pushed image | workflow artifact on the **Image Provisioned NVCR** run |
 
-The Helm charts — `nke-controller` and `nktp` — have no SBOM of their own. A
+The Helm charts — `nvke-controller` and `nktp` — have no SBOM of their own. A
 chart carries no components; it carries a reference to an image that does, and
 that image's SBOM is the row above. An SBOM of the chart archive would list the
 archive.

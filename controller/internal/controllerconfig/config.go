@@ -200,10 +200,12 @@ type SpireConfig struct {
 }
 
 // Infrastructure provider names accepted in Config.SupportedInfraProviders,
-// matching config.InfraProviderNico and config.InfraProviderInfra.
+// matching config.InfraProviderNico, config.InfraProviderInfra and
+// config.InfraProviderLaunchLayer.
 const (
-	InfraProviderNico  = "nico"
-	InfraProviderInfra = "infra"
+	InfraProviderNico        = "nico"
+	InfraProviderInfra       = "infra"
+	InfraProviderLaunchLayer = "launchLayer"
 )
 
 // SpireAttestationMethod values accepted by NodeAgentConfig.SpireAttestationMethod,
@@ -219,12 +221,13 @@ const (
 // are not included: the chart has never set them, so they stay on their Go
 // default in internal/config until something needs to set them.
 type TeleportConfig struct {
-	Enabled             bool   `json:"enabled"`
-	IdentityFile        string `json:"identityFile"`
-	ProxyAddress        string `json:"proxyAddress"`
-	Environment         string `json:"environment"`
-	ManagedByLabelValue string `json:"managedByLabelValue"`
-	TokenNamePrefix     string `json:"tokenNamePrefix"`
+	Enabled                      bool     `json:"enabled"`
+	IdentityFile                 string   `json:"identityFile"`
+	ProxyAddress                 string   `json:"proxyAddress"`
+	Environment                  string   `json:"environment"`
+	ManagedByLabelValue          string   `json:"managedByLabelValue"`
+	AcceptedManagedByLabelValues []string `json:"acceptedManagedByLabelValues"`
+	TokenNamePrefix              string   `json:"tokenNamePrefix"`
 
 	ResourceGroupLabelValue string `json:"resourceGroupLabelValue"`
 }
@@ -362,8 +365,8 @@ func validateSupportedInfraProviders(providers []string) error {
 		if err := requireUnpadded(fmt.Sprintf("[%d]", i), provider); err != nil {
 			return err
 		}
-		if provider != InfraProviderNico && provider != InfraProviderInfra {
-			return fmt.Errorf("[%d] %q is not a supported provider, which are %q and %q", i, provider, InfraProviderNico, InfraProviderInfra)
+		if provider != InfraProviderNico && provider != InfraProviderInfra && provider != InfraProviderLaunchLayer {
+			return fmt.Errorf("[%d] %q is not a supported provider, which are %q, %q and %q", i, provider, InfraProviderNico, InfraProviderInfra, InfraProviderLaunchLayer)
 		}
 		if prev, dup := seen[provider]; dup {
 			return fmt.Errorf("[%d] %q duplicates [%d]", i, provider, prev)

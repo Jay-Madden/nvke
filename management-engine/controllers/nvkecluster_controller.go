@@ -39,8 +39,8 @@ const (
 	nodePoolTemplateKey  = "nodepoolTmpl"
 )
 
-// ControllerClient is the existing REST API surface used by cluster reconciliation.
-type ControllerClient interface {
+// NVKEControllerClient is the existing REST API surface used by cluster reconciliation.
+type NVKEControllerClient interface {
 	FindByName(ctx context.Context, name string) (*api.Cluster, error)
 	Create(ctx context.Context, request api.CreateClusterRequest) (*api.Cluster, error)
 	Delete(ctx context.Context, id string) error
@@ -53,7 +53,7 @@ type ControllerClient interface {
 // NVKEClusterReconciler coordinates cluster provisioning from declarative intent.
 type NVKEClusterReconciler struct {
 	client.Client
-	NVKEClient                 ControllerClient
+	NVKEController             NVKEControllerClient
 	PollInterval               time.Duration
 	InfraTemplateConfigMapName string
 }
@@ -84,7 +84,7 @@ func (r *NVKEClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		}
 	}()
 
-	if r.NVKEClient == nil {
+	if r.NVKEController == nil {
 		propagateNVKEControllerConditions(&cluster, nil)
 		return ctrl.Result{}, nil
 	}
@@ -243,7 +243,7 @@ func (r *NVKEClusterReconciler) reconcileNodePool(ctx context.Context, cluster *
 		status = &cluster.Status.NodePools[len(cluster.Status.NodePools)-1]
 	}
 
-	observedPool, err := r.NVKEClient.FindNodePool(ctx, observedCluster.Name, string(pool.Name))
+	observedPool, err := r.NVKEController.FindNodePool(ctx, observedCluster.Name, string(pool.Name))
 	if errors.Is(err, nvkecontroller.ErrNotFound) {
 		request, err := resolveNodePoolRequest(observedCluster.ID, pool)
 		if err != nil {
@@ -257,7 +257,7 @@ func (r *NVKEClusterReconciler) reconcileNodePool(ctx context.Context, cluster *
 			return fmt.Errorf("%s must contain a machineTemplate manifest", nodePoolTemplateKey)
 		}
 		request.Infra = &infra
-		observedPool, err := r.NVKEClient.CreateNodePool(ctx, request)
+		observedPool, err := r.NVKEController.CreateNodePool(ctx, request)
 		if err != nil {
 			return fmt.Errorf("create nvke controller node pool %q: %w", pool.Name, err)
 		}
@@ -278,11 +278,11 @@ func (r *NVKEClusterReconciler) reconcileNodePool(ctx context.Context, cluster *
 		return nil
 	}
 	if pool.Replicas == nil || *pool.Replicas < 0 {
-		return invalidControllerRequest("Node pool replicas must be a nonnegative count")
+		return invalidNVKEControllerRequest("Node pool replicas must be a nonnegative count")
 	}
 	desiredCount := int(*pool.Replicas)
 	if observedPool.DesiredNodeCount != desiredCount {
-		updatedPool, err := r.NVKEClient.UpdateNodePool(ctx, observedPool.ID.String(), api.UpdateNodePoolRequest{DesiredNodeCount: &desiredCount})
+		updatedPool, err := r.NVKEController.UpdateNodePool(ctx, observedPool.ID.String(), api.UpdateNodePoolRequest{DesiredNodeCount: &desiredCount})
 		if err != nil {
 			return fmt.Errorf("scale nvke controller node pool %q to %d replicas: %w", pool.Name, desiredCount, err)
 		}
@@ -292,7 +292,7 @@ func (r *NVKEClusterReconciler) reconcileNodePool(ctx context.Context, cluster *
 }
 
 func (r *NVKEClusterReconciler) reconcileNodePoolDelete(ctx context.Context, cluster *internalv1.NVKECluster, pool *internalv1.NodePoolStatus, observedCluster *api.Cluster) (bool, error) {
-	observedPool, err := r.NVKEClient.FindNodePool(ctx, observedCluster.Name, string(pool.Name))
+	observedPool, err := r.NVKEController.FindNodePool(ctx, observedCluster.Name, string(pool.Name))
 	if errors.Is(err, nvkecontroller.ErrNotFound) {
 		return true, nil
 	}
@@ -305,7 +305,7 @@ func (r *NVKEClusterReconciler) reconcileNodePoolDelete(ctx context.Context, clu
 	pool.ID = observedPool.ID.String()
 	propagateNodePoolConditions(pool, observedPool, cluster.Generation)
 	if observedPool.Conditions.Deleting.Status != api.ConditionStatus("True") {
-		if err := r.NVKEClient.DeleteNodePool(ctx, observedPool.ID.String()); err != nil {
+		if err := r.NVKEController.DeleteNodePool(ctx, observedPool.ID.String()); err != nil {
 			return false, fmt.Errorf("delete nvke controller node pool %q: %w", pool.Name, err)
 		}
 	}
@@ -321,7 +321,7 @@ func (r *NVKEClusterReconciler) reconcileNodePoolDelete(ctx context.Context, clu
 
 func (r *NVKEClusterReconciler) ensureCluster(ctx context.Context, cluster *internalv1.NVKECluster, infra *api.InfraClusterProvider) (*api.Cluster, error) {
 	name := ClusterRemoteName(cluster)
-	observedCluster, err := r.NVKEClient.FindByName(ctx, name)
+	observedCluster, err := r.NVKEController.FindByName(ctx, name)
 	if err == nil {
 		cluster.Status.ID = observedCluster.ID.String()
 		return observedCluster, nil
@@ -330,7 +330,7 @@ func (r *NVKEClusterReconciler) ensureCluster(ctx context.Context, cluster *inte
 		return nil, fmt.Errorf("find nvke controller cluster %q: %w", name, err)
 	}
 
-	request, err := resolveControllerRequest(cluster)
+	request, err := resolveNVKEControllerRequest(cluster)
 	if err != nil {
 		conditions.Set(cluster, metav1.Condition{
 			Type:    internalv1.ClusterReconciledCondition,
@@ -341,7 +341,7 @@ func (r *NVKEClusterReconciler) ensureCluster(ctx context.Context, cluster *inte
 		return nil, fmt.Errorf("resolve controller request: %w", err)
 	}
 	request.Infra = infra
-	observedCluster, err = r.NVKEClient.Create(ctx, request)
+	observedCluster, err = r.NVKEController.Create(ctx, request)
 	if err != nil {
 		conditions.Set(cluster, metav1.Condition{
 			Type:    internalv1.ClusterReconciledCondition,
@@ -366,7 +366,7 @@ func (r *NVKEClusterReconciler) reconcileDelete(ctx context.Context, cluster *in
 	}
 
 	name := ClusterRemoteName(cluster)
-	observedCluster, err := r.NVKEClient.FindByName(ctx, name)
+	observedCluster, err := r.NVKEController.FindByName(ctx, name)
 	propagateNVKEControllerConditions(cluster, observedCluster)
 	if errors.Is(err, nvkecontroller.ErrNotFound) {
 		controllerutil.RemoveFinalizer(cluster, nvkeClusterFinalizer)
@@ -379,7 +379,7 @@ func (r *NVKEClusterReconciler) reconcileDelete(ctx context.Context, cluster *in
 	cluster.Status.ID = observedCluster.ID.String()
 
 	if observedCluster.Conditions.Deleting.Status != api.ConditionStatus("True") {
-		if err := r.NVKEClient.Delete(ctx, observedCluster.ID.String()); err != nil && !errors.Is(err, nvkecontroller.ErrNotFound) {
+		if err := r.NVKEController.Delete(ctx, observedCluster.ID.String()); err != nil && !errors.Is(err, nvkecontroller.ErrNotFound) {
 			return ctrl.Result{}, fmt.Errorf("delete nvke controller cluster %q: %w", name, err)
 		}
 	}
@@ -394,27 +394,27 @@ type InvalidSpecError struct{ Message string }
 
 func (e *InvalidSpecError) Error() string { return e.Message }
 
-// resolveControllerRequest translates supported cluster intent using the temporary hardcoded class configuration.
-func resolveControllerRequest(cluster *internalv1.NVKECluster) (api.CreateClusterRequest, error) {
+// resolveNVKEControllerRequest translates supported cluster intent using the temporary hardcoded class configuration.
+func resolveNVKEControllerRequest(cluster *internalv1.NVKECluster) (api.CreateClusterRequest, error) {
 	var empty api.CreateClusterRequest
-	if err := validateControllerSpec(cluster); err != nil {
+	if err := validateNVKEControllerSpec(cluster); err != nil {
 		return empty, fmt.Errorf("validate cluster spec: %w", err)
 	}
 	var request api.CreateClusterRequest
-	if err := resolveControllerClass(cluster.Spec.ControlPlaneClass, &request); err != nil {
+	if err := resolveNVKEControllerClass(cluster.Spec.ControlPlaneClass, &request); err != nil {
 		return empty, fmt.Errorf("resolve control-plane class: %w", err)
 	}
 	request.Name = ClusterRemoteName(cluster)
 	if cluster.UID == "" {
-		return empty, invalidControllerRequest("A persisted cluster UID is required before provisioning")
+		return empty, invalidNVKEControllerRequest("A persisted cluster UID is required before provisioning")
 	}
 	request.CniPlugin = api.CreateClusterRequestCniPluginOvnKubernetes
 	request.EtcdEncrypted = true
-	pod, err := controllerNetworkPrefix(cluster.Spec.ClusterNetwork.Pods.CIDRBlocks)
+	pod, err := nvkeControllerNetworkPrefix(cluster.Spec.ClusterNetwork.Pods.CIDRBlocks)
 	if err != nil {
 		return empty, fmt.Errorf("resolve pod network: %w", err)
 	}
-	service, err := controllerNetworkPrefix(cluster.Spec.ClusterNetwork.Services.CIDRBlocks)
+	service, err := nvkeControllerNetworkPrefix(cluster.Spec.ClusterNetwork.Services.CIDRBlocks)
 	if err != nil {
 		return empty, fmt.Errorf("resolve service network: %w", err)
 	}
@@ -425,10 +425,10 @@ func resolveControllerRequest(cluster *internalv1.NVKECluster) (api.CreateCluste
 func resolveNodePoolRequest(clusterID uuid.UUID, pool *internalv1.NodePool) (api.CreateNodePoolRequest, error) {
 	var request api.CreateNodePoolRequest
 	if clusterID == uuid.Nil {
-		return request, invalidControllerRequest("A resolved cluster ID is required before creating node pools")
+		return request, invalidNVKEControllerRequest("A resolved cluster ID is required before creating node pools")
 	}
 	if pool.Replicas == nil || *pool.Replicas < 0 {
-		return request, invalidControllerRequest("Node pool replicas must be a nonnegative count")
+		return request, invalidNVKEControllerRequest("Node pool replicas must be a nonnegative count")
 	}
 	request = api.CreateNodePoolRequest{
 		ClusterID:                   clusterID,
@@ -455,31 +455,31 @@ func resolveNodePoolRequest(clusterID uuid.UUID, pool *internalv1.NodePool) (api
 	return request, nil
 }
 
-func invalidControllerRequest(message string) error { return &InvalidSpecError{Message: message} }
+func invalidNVKEControllerRequest(message string) error { return &InvalidSpecError{Message: message} }
 
-func validateControllerSpec(cluster *internalv1.NVKECluster) error {
+func validateNVKEControllerSpec(cluster *internalv1.NVKECluster) error {
 	if cluster.Spec.Authentication != nil {
-		return invalidControllerRequest("Custom authentication is not supported")
+		return invalidNVKEControllerRequest("Custom authentication is not supported")
 	}
 	if cluster.Spec.APIServerAccess.PublicAccessEnabled || len(cluster.Spec.APIServerAccess.PublicAccessCIDRs) != 0 {
-		return invalidControllerRequest("Public API access configuration is not supported")
+		return invalidNVKEControllerRequest("Public API access configuration is not supported")
 	}
 	if runtime := cluster.Spec.AcceleratedRuntime; runtime != nil && (runtime.Name != "none" || runtime.Version != "") {
-		return invalidControllerRequest("Accelerated runtime configuration is not supported")
+		return invalidNVKEControllerRequest("Accelerated runtime configuration is not supported")
 	}
 	if cluster.Spec.ClusterNetwork.ServiceDomain != "cluster.local" {
-		return invalidControllerRequest("Only the cluster.local service domain is supported")
+		return invalidNVKEControllerRequest("Only the cluster.local service domain is supported")
 	}
 	return nil
 }
 
-func controllerNetworkPrefix(blocks []internalv1.NetworkCIDR) (string, error) {
+func nvkeControllerNetworkPrefix(blocks []internalv1.NetworkCIDR) (string, error) {
 	if len(blocks) != 1 {
-		return "", invalidControllerRequest("Exactly one IPv4 pod range and one IPv4 service range are required")
+		return "", invalidNVKEControllerRequest("Exactly one IPv4 pod range and one IPv4 service range are required")
 	}
 	prefix, err := netip.ParsePrefix(string(blocks[0]))
 	if err != nil || !prefix.Addr().Is4() {
-		return "", invalidControllerRequest("Pod and service ranges must be valid IPv4 CIDRs")
+		return "", invalidNVKEControllerRequest("Pod and service ranges must be valid IPv4 CIDRs")
 	}
 	// The NVKE controller remains authoritative for private ranges, overlap, size, and capacity validation.
 	return prefix.Masked().String(), nil
@@ -717,7 +717,7 @@ func dockerMachineTemplate() map[string]any {
 	}
 }
 
-func resolveControllerClass(class internalv1.ResourceName, request *api.CreateClusterRequest) error {
+func resolveNVKEControllerClass(class internalv1.ResourceName, request *api.CreateClusterRequest) error {
 	_ = class
 	request.ControlPlaneKubernetesVersion = "1.36.1"
 	request.ControlPlaneConfig = &api.CreateClusterControlPlaneConfig{

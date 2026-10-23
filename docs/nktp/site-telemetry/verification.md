@@ -2,11 +2,11 @@
 
 A Collector can be Ready and still export nothing, so this checklist checks
 the signals themselves, not just the Pods. Run it after the management plane is
-installed through the `deploy/nico` deploy path, or after any change to its NVKE telemetry pipelines (NKTP)
+installed through the `deploy/nico` deploy path, or after any change to its NVKE telemetry pipeline (NKTP)
 values. It assumes the development backend, `lgtm`. Against your own backend,
 run the same queries there.
 
-On an existing site, where the controller runs as `cloud-workflow-engine`,
+On an existing site, where the NVKE controller runs as `cloud-workflow-engine`,
 replace `nke-controller` with `cloud-workflow-engine` throughout this page.
 
 All commands run against the management cluster:

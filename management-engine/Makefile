@@ -352,5 +352,5 @@ helm-uninstall: require-host-context ## Uninstall the Helm release from the K8s 
 chart-check: manifests ## Lint and render the Helm chart without a cluster.
 	$(HELM) lint chart -f config/samples/runtime-values.yaml
 	$(HELM) template management-engine chart --namespace management-engine-system -f config/samples/runtime-values.yaml > dist/chart-rendered.yaml
-	$(HELM) lint chart -f config/samples/runtime-values.yaml -f config/samples/controller-values.yaml
-	$(HELM) template management-engine chart --namespace management-engine-system -f config/samples/runtime-values.yaml -f config/samples/controller-values.yaml > dist/chart-controller-rendered.yaml
+	$(HELM) lint chart -f config/samples/runtime-values.yaml -f config/samples/nvke-controller-values.yaml
+	$(HELM) template management-engine chart --namespace management-engine-system -f config/samples/runtime-values.yaml -f config/samples/nvke-controller-values.yaml > dist/chart-nvke-controller-rendered.yaml

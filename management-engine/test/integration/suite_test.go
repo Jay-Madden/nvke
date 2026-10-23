@@ -32,31 +32,31 @@ import (
 type environment struct {
 	host              client.Client
 	state             client.Client
-	controller        *api.ClientWithResponses
+	nvkeController    *api.ClientWithResponses
 	temporal          string
 	temporalAddress   string
 	temporalNamespace string
 	resultsDir        string
 }
 
-func TestControllerIntegration(t *testing.T) {
+func TestNVKEControllerIntegration(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Management Engine Controller Integration Suite")
+	RunSpecs(t, "Management Engine NVKE Controller Integration Suite")
 }
 
 func loadEnvironment() environment {
 	kubeconfig := requiredEnv("KUBECONFIG")
 	hostContext, stateContext := requiredEnv("HOST_CONTEXT"), requiredEnv("STATE_CONTEXT")
 	Expect(hostContext).NotTo(Equal(stateContext), "host and state clusters must be separate")
-	endpoint := requiredEnv("NKE_CONTROLLER_API_URL")
+	endpoint := requiredEnv("NVKE_CONTROLLER_API_URL")
 	endpointURL, err := url.Parse(endpoint)
 	Expect(err).NotTo(HaveOccurred())
 	Expect(endpointURL.Scheme).To(Equal("http"), "use the local NVKE controller port-forward")
 	Expect(isLoopback(endpointURL.Hostname())).To(BeTrue(), "The NVKE controller must use a loopback port-forward")
-	tokenFile := requiredEnv("NKE_CONTROLLER_TOKEN_FILE")
+	tokenFile := requiredEnv("NVKE_CONTROLLER_TOKEN_FILE")
 	_, err = os.Stat(tokenFile)
 	Expect(err).NotTo(HaveOccurred())
-	controller, err := api.NewClientWithResponses(endpoint, api.WithHTTPClient(&http.Client{
+	nvkeController, err := api.NewClientWithResponses(endpoint, api.WithHTTPClient(&http.Client{
 		Timeout:       10 * time.Second,
 		CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse },
 	}), api.WithRequestEditorFn(func(_ context.Context, req *http.Request) error {
@@ -79,9 +79,9 @@ func loadEnvironment() environment {
 	Expect(isLoopback(host)).To(BeTrue(), "Temporal must use a loopback port-forward")
 	return environment{
 		host: newLocalClient(kubeconfig, hostContext), state: newLocalClient(kubeconfig, stateContext),
-		controller: controller, temporal: temporal, temporalAddress: address,
+		nvkeController: nvkeController, temporal: temporal, temporalAddress: address,
 		temporalNamespace: envOr("TEMPORAL_NAMESPACE", "nke-controller"),
-		resultsDir:        requiredEnv("NKE_CONTROLLER_RESULTS_DIR"),
+		resultsDir:        requiredEnv("NVKE_CONTROLLER_RESULTS_DIR"),
 	}
 }
 

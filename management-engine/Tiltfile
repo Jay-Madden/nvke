@@ -19,7 +19,7 @@ def register(ctx):
         "management-engine-controller-manager",
         new_name="management-engine",
         objects=["management-engine-controller-manager:serviceaccount"],
-        resource_deps=["cwe"],
+        resource_deps=["nvke-controller"],
         port_forwards=[metrics_port + ":8443"] if metrics_port else [],
         labels=["management-engine"],
         links=[
@@ -43,6 +43,6 @@ def register(ctx):
         inputs=[text_input("CLUSTER_NAME", label="Cluster name", default="test-docker")],
     )
     return struct(
-        cwe_resource_deps=[],
-        cwe_env_overrides={},
+        controller_resource_deps=[],
+        controller_env_overrides={},
     )

@@ -69,6 +69,7 @@ var stayEnv = map[string]string{
 
 	"LOG_LEVEL":                                chartUnset,
 	"DB_QUERY_LOG_LEVEL":                       chartUnset,
+	"DB_QUERY_LOG_VALUES":                      chartUnset,
 	"DB_MAX_OPEN_CONNECTIONS":                  chartUnset,
 	"SERVER_LISTEN_ADDRESS":                    chartUnset,
 	"OUTBOX_POLLING_INTERVAL":                  chartUnset,
@@ -107,6 +108,9 @@ var configMapOnly = []string{
 	"nodeMetadataAllowlistedLabelKeys",
 	"machineMetadataAllowlistedLabelKeys",
 	"machineMetadataAllowlistedAnnotationKeys",
+	// The dual-accept window for the Teleport "managed-by" value. It exists
+	// because managedByLabelValue moved, which is newer than the environment.
+	"teleport.acceptedManagedByLabelValues",
 }
 
 // chartDeployment is the template whose env block decides what the chart sets.

@@ -129,6 +129,12 @@ kubectl get deployment nke-controller -n nke-controller -o jsonpath='{.spec.temp
 - **Cause:** An earlier run kept its seed cluster, which can hold the only copy of that cluster's etcd encryption key.
 - **Fix:** Save every `etcd-encryption-key-*` Secret the message lists, then delete the seed cluster as in the retry steps. Keep the `KIND_EXPERIMENTAL_PROVIDER=nerdctl` prefix, or `kind` deletes nothing and the next run stops on the same message.
 
+### The node CNI directory holds nerdctl network configs
+
+- **Symptom:** `/etc/cni/net.d already holds nerdctl network config(s), and this node's own containerd reads that directory for pod networking`, followed by the list of `nerdctl-*.conflist` files.
+- **Cause:** nerdctl ran as root on this host without `cni_netconfpath` set, so it wrote its network configs to `/etc/cni/net.d`. A node's containerd reads that directory for pod networking, and until the cluster's CNI plugin writes its own configuration, the first pods, CoreDNS among them, would get addresses on nerdctl's bridge.
+- **Fix:** List the bridges the files name with `grep -h '"bridge":' /etc/cni/net.d/nerdctl-*.conflist` before you remove them. Remove the files, delete each of those bridges with `ip link delete <BRIDGE>`, and set `cni_netconfpath = "/etc/containerd-nerdctl/net.d"` in `/etc/nerdctl/nerdctl.toml` so nerdctl keeps its networks out of that directory. Then run the bootstrap again.
+
 ### An etcd encryption key file already exists
 
 - **Symptom:** `<CLUSTER_NAME>-etcd-encryption-key.json already exists and holds the etcd encryption key of an earlier bootstrap of this cluster name`.
@@ -144,7 +150,7 @@ kubectl get deployment nke-controller -n nke-controller -o jsonpath='{.spec.temp
 ### An NVKE image is missing or cannot be pulled
 
 - **Symptom:** `image <IMAGE> is not in the local image store`, or a `nerdctl pull` error that ends with `if this is an authentication failure, log in to the image's registry`.
-- **Cause:** The `--controller-image` or `--provisioned-provider-image` reference has no registry host and was never built on this host, or the registry refused the pull.
+- **Cause:** The `--nvke-controller-image` or `--provisioned-provider-image` reference has no registry host and was never built on this host, or the registry refused the pull.
 - **Fix:** Build the images with `make -C nvke/cli images`, or pass full image references. For a refused pull, run `nerdctl login <REGISTRY_HOST>` first.
 
 ### A required tool is missing
@@ -198,24 +204,24 @@ kubectl get deployment nke-controller -n nke-controller -o jsonpath='{.spec.temp
 
 ## Management-plane install
 
-The install stops at the component that failed. Fix the cause and run the same command again, as described in [Install management-plane services](install-management-plane-services.md#if-the-install-fails).
+The install stops at the component that failed. Fix the cause and run the same command again, as described in [Run NVKE end to end on one machine](../get-started/local-site.md).
 
 ### The stack config is not ready
 
-- **Symptom:** `deploy/check-site.sh` reports `FAIL  stack config: <FILE> is not ready: <KEY>: <PROBLEM>`, or the install stops with `stack config <FILE>:` followed by one line per problem, such as `nico.endpoint: still a REPLACE_* placeholder; fill it in` or `environment: NVKECTL_NICO_TOKEN is not set`.
+- **Symptom:** The install stops with `stack config <FILE>:` followed by one line per problem, such as `nico.endpoint: still a REPLACE_* placeholder; fill it in` or `environment: NVKECTL_NICO_TOKEN is not set`.
 - **Cause:** A value in the stack config is still a `REPLACE_*` placeholder, a required key is empty, the file carries a key it must not, or one of the `NVKECTL_*` variables is not exported in the shell you run from.
-- **Fix:** Edit the key or export the variable as described in [Install management-plane services](install-management-plane-services.md#write-the-stack-config), then run the check again until the stack config passes.
+- **Fix:** Edit the key or export the variable as described in [Run NVKE end to end on one machine](../get-started/local-site.md), then run the check again until the stack config passes.
 
 ### The install refuses the release
 
 - **Symptom:** The install stops before it changes the cluster with `<ITEM>: <ROLE> <ARTIFACT> is not in the release`, for example for `controller-profiles` or `capnico-controller`.
 - **Cause:** The release description does not carry an artifact that the deploy path names, for the management nodes' CPU architecture.
-- **Fix:** Use a release that carries the artifact, or install without `--release` and name the images in the stack config's `images`, as described in [Choose where the artifacts come from](install-management-plane-services.md#choose-where-the-artifacts-come-from).
+- **Fix:** Use a release that carries the artifact, or install without `--release` and name the images in the stack config's `images`, as described in [Run NVKE end to end on one machine](../get-started/local-site.md).
 
 ### A volume claim stays Pending
 
 - **Symptom:** `kubectl get pvc -A` shows a claim in `Pending`, and the component that owns it times out.
-- **Cause:** The management cluster has no default StorageClass. The bootstrap installs none. `deploy/check-site.sh` reports this as a `FAIL`.
+- **Cause:** The management cluster has no default StorageClass. The bootstrap installs none.
 - **Fix:** Install a storage provisioner, mark its StorageClass as the default, and run the install again.
 
 ### An image cannot be pulled
@@ -290,7 +296,7 @@ The install stops at the component that failed. Fix the cause and run the same c
 
 - **Symptom:** Nodes do not progress, and the management-plane log contains `resolving release "<NAME>"`.
 - **Cause:** The control plane must name an existing cluster release and each node pool an existing node pool release.
-- **Fix:** Check the names with `nvkectl get clusterreleases` and `nvkectl get nodepoolreleases`. Apply the missing releases as in [Install management-plane services](install-management-plane-services.md), or delete the cluster and create it again with names that exist.
+- **Fix:** Check the names with `nvkectl get clusterreleases` and `nvkectl get nodepoolreleases`. Apply the missing releases as in [Run NVKE end to end on one machine](../get-started/local-site.md), or delete the cluster and create it again with names that exist.
 
 ### The cluster shows ProvisioningFailed
 

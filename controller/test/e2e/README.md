@@ -119,7 +119,7 @@ cd test/e2e
 go run github.com/onsi/ginkgo/v2/ginkgo@v2.27.2 run -v --label-filter=health .
 ```
 
-Only `NKE_CONTROLLER_EXPECTED_VERSION` and `NKE_CONTROLLER_HEALTH_TIMEOUT` are specific to the health
+Only `NVKE_CONTROLLER_EXPECTED_VERSION` and `NVKE_CONTROLLER_HEALTH_TIMEOUT` are specific to the health
 specs; the first four apply everywhere. The `NKE_E2E_*` group configures the
 credential `nvke.NewClient` discovers and presents on every ordinary NVKE call,
 not the authentication specs, which build their own token per case.
@@ -127,19 +127,23 @@ not the authentication specs, which build their own token per case.
 | Variable | Description | Default |
 | --- | --- | --- |
 | `KUBECONFIG` | Kubeconfig used to reach the management cluster (clientcmd default loading rules). | Unset (falls back to in-cluster configuration) |
-| `NKE_CONTROLLER_NAMESPACE` | Namespace containing the controller. The old name `CWE_NAMESPACE` is deprecated and still read when this is unset, until [nvke#1399](https://github.com/dsx-ai-factory/nvke/issues/1399) removes it. | `nke-controller` |
-| `NKE_CONTROLLER_SERVICE` | Controller Service whose backing pod is port-forwarded to; also the name of its Deployment, container and ServiceAccount. The old name `CWE_SERVICE` is deprecated and still read when this is unset, until [nvke#1399](https://github.com/dsx-ai-factory/nvke/issues/1399) removes it. | `nke-controller` |
-| `NKE_CONTROLLER_SERVICE_PORT` | Controller Service port, by name or number; the pod-side port is resolved from its `targetPort`. The old name `CWE_SERVICE_PORT` is deprecated and still read when this is unset, until [nvke#1399](https://github.com/dsx-ai-factory/nvke/issues/1399) removes it. | `8080` |
-| `NKE_CONTROLLER_EXPECTED_VERSION` | Required controller version; when unset, the version spec is skipped. The old name `CWE_EXPECTED_VERSION` is deprecated and still read when this is unset, until [nvke#1399](https://github.com/dsx-ai-factory/nvke/issues/1399) removes it. | Unset |
-| `NKE_CONTROLLER_HEALTH_TIMEOUT` | Per-spec context timeout. The old name `CWE_HEALTH_TIMEOUT` is deprecated and still read when this is unset, until [nvke#1399](https://github.com/dsx-ai-factory/nvke/issues/1399) removes it. | `60s` |
+| `NVKE_CONTROLLER_NAMESPACE` | Namespace containing the controller. The old names `NKE_CONTROLLER_NAMESPACE` and `CWE_NAMESPACE` are deprecated and still read when this is unset, until [nvke#1399](https://github.com/dsx-ai-factory/nvke/issues/1399) removes them. | `nke-controller` |
+| `NVKE_CONTROLLER_SERVICE` | Controller Service whose backing pod is port-forwarded to; also the name of its Deployment, container and ServiceAccount. The old names `NKE_CONTROLLER_SERVICE` and `CWE_SERVICE` are deprecated and still read when this is unset, until [nvke#1399](https://github.com/dsx-ai-factory/nvke/issues/1399) removes them. | `nke-controller` |
+| `NVKE_CONTROLLER_SERVICE_PORT` | Controller Service port, by name or number; the pod-side port is resolved from its `targetPort`. The old names `NKE_CONTROLLER_SERVICE_PORT` and `CWE_SERVICE_PORT` are deprecated and still read when this is unset, until [nvke#1399](https://github.com/dsx-ai-factory/nvke/issues/1399) removes them. | `8080` |
+| `NVKE_CONTROLLER_EXPECTED_VERSION` | Required controller version; when unset, the version spec is skipped. The old names `NKE_CONTROLLER_EXPECTED_VERSION` and `CWE_EXPECTED_VERSION` are deprecated and still read when this is unset, until [nvke#1399](https://github.com/dsx-ai-factory/nvke/issues/1399) removes them. | Unset |
+| `NVKE_CONTROLLER_HEALTH_TIMEOUT` | Per-spec context timeout. The old names `NKE_CONTROLLER_HEALTH_TIMEOUT` and `CWE_HEALTH_TIMEOUT` are deprecated and still read when this is unset, until [nvke#1399](https://github.com/dsx-ai-factory/nvke/issues/1399) removes them. | `60s` |
 | `NKE_E2E_AUTH_DISABLE` | Turns the token source off, so the suite sends no `Authorization` header. Against an enforcing NVKE every spec then fails with 401. | Unset |
-| `NKE_E2E_AUDIENCE` | Overrides the audience the suite mints for. Normally discovered from the `nke-auth-config` ConfigMap in `NKE_CONTROLLER_NAMESPACE`. | Discovered |
+| `NKE_E2E_AUDIENCE` | Overrides the audience the suite mints for. Normally discovered from the authentication ConfigMap in `NVKE_CONTROLLER_NAMESPACE` -- `nvke-auth-config`, or `nke-auth-config` on a site that pins the older name. | Discovered |
 | `NKE_E2E_TOKEN_NAMESPACE` | Namespace of the service account the suite presents. | `nke-clients` |
 | `NKE_E2E_TOKEN_SERVICE_ACCOUNT` | Service account the suite presents. Point this pair at `nke-outsiders`/`nke-outsider` for the 403 case. | `nke-client` |
 | `NKE_E2E_TOKEN_TTL` | Minted token lifetime. The apiserver rejects anything under 10m. | `15m` |
 
-When the `nke-auth-config` ConfigMap does not exist, the suite sends no token,
-so an unauthenticated NVKE needs no configuration here.
+The suite sends no token only when *neither* `nvke-auth-config` nor
+`nke-auth-config` exists in that namespace, so an unauthenticated NVKE needs no
+configuration here. A run against a site pinned to the older name still
+discovers its audience and authenticates. A ConfigMap that exists but cannot be
+read is reported rather than treated as absent, so an RBAC gap does not quietly
+turn the authn specs into assertions about an unauthenticated NVKE.
 
 Unfiltered runs, including `make test-e2e`, include the health specs. To exclude
 them, pass `--label-filter='!health'`.
@@ -161,9 +165,9 @@ needs, reading `AUTH_CONFIG_PATH` off the live NVKE Deployment and
 cluster with authentication off produces `SUCCESS! -- 0 Passed | 0 Failed | N
 Skipped`, indistinguishable in a CI log from a suite that never had these specs.
 
-**Prerequisites.** `tilt up` applies `deploy/k8s/nke-auth-dev.yaml` (client
-namespaces, service accounts, token-minter RBAC and the `nke-auth-config`
-ConfigMap) and, for `authn-spire`, `deploy/k8s/nke-spire-client.yaml`. NVKE's
+**Prerequisites.** `tilt up` applies `deploy/k8s/nvke-auth-dev.yaml` (client
+namespaces, service accounts, token-minter RBAC and the `nvke-auth-config`
+ConfigMap) and, for `authn-spire`, `deploy/k8s/nvke-spire-client.yaml`. NVKE's
 permission to read the cluster JWKS comes from the chart
 (`apiAuth.clusterIssuerDiscovery`).
 
@@ -249,16 +253,22 @@ wait for both nodes to become Ready in CWE, and delete the cluster. The matrix
 reads active release names, architectures, and Kubernetes versions from the
 fleet releases (NodePoolReleases that are not deprecated, and the
 MachineImages they reference), which is maintained outside this repository.
-Resolution order:
+If `NVKE_CONTROLLER_RELEASES_DIR` is set, it is used exclusively and must
+contain at least one YAML release manifest. A missing or empty explicit
+directory causes suite initialization to fail. The old name
+`NKE_CONTROLLER_RELEASES_DIR` is deprecated and still read when the new one is
+unset, until [nvke#1399](https://github.com/dsx-ai-factory/nvke/issues/1399)
+removes it.
 
-1. `$NKE_CONTROLLER_RELEASES_DIR`
-2. sibling `../nke-site-deploy/cwe-profiles/releases`
+When the variable is unset, releases are resolved in this order:
+
+1. sibling `../nke-site-deploy/cwe-profiles/releases`
    (an NVIDIA-internal fleet repository; external contributors use the
    environment variable above instead)
-3. the stub mirror in `test/fixtures/fleet-releases`
+2. the stub mirror in `test/fixtures/fleet-releases`
 
-If no releases are found, nico-vms matrix table entries are skipped at
-suite init (no panic) so CAPD and other label filters can still run.
+If neither fallback contains releases, nico-vms matrix table entries are
+skipped at suite init so CAPD and other label filters can still run.
 
 Profiles with an embedded Kubernetes version use that version for their
 cluster; version-injected profiles use the suite default.
@@ -281,7 +291,7 @@ When adding a release:
 
 1. Add its MachineImage, ClusterRelease and NodePoolRelease to the fleet
    releases (for NVIDIA maintainers, the internal fleet repository; otherwise
-   the directory `$NKE_CONTROLLER_RELEASES_DIR` points at).
+   the directory `$NVKE_CONTROLLER_RELEASES_DIR` points at).
 2. For a tenant profile, no separate e2e list update is required; the matrix
    includes it automatically on a runner of its architecture.
 3. If nico-vms cannot support it, add it to
@@ -491,7 +501,7 @@ go test -timeout 5h . -args \
 no `site:` block is needed at all:
 
 ```bash
-gmake site-inputs SITE_CONTROLLER_VERSION=$(git rev-parse --short=12 HEAD)
+gmake site-inputs SITE_NVKE_CONTROLLER_VERSION=$(git rev-parse --short=12 HEAD)
 go test -timeout 5h . -args \
   -ginkgo.label-filter=site-controller -ginkgo.v \
   -e2e.config=e2e-config.yaml -e2e.environment=forge -e2e.site-stage=full \
@@ -513,7 +523,7 @@ pair. The CI workflow always passes suffixed pairs, from the
 `QUALIFY_E2E_OS_IMAGE_<ARCH>` and `QUALIFY_E2E_OS_IMAGE_BOOTLOADER_<ARCH>`
 repository variables.
 
-`SITE_CONTROLLER_VERSION` and `-e2e.versions=controller=` have to be the same
+`SITE_NVKE_CONTROLLER_VERSION` and `-e2e.versions=controller=` have to be the same
 string, because they name one image: the archive `site-inputs` writes, and the
 reference the suite hands the bootstrap and the deploy path, which the node
 resolves out of its own containerd rather than a registry. The suite builds
@@ -526,7 +536,7 @@ NGC org; the image names are the same:
 
 ```bash
 echo "$NGC_KEY" | docker login nvcr.io -u '$oauthtoken' --password-stdin
-gmake site-inputs SITE_IMAGE_REGISTRY=nvcr.io/<org> SITE_CONTROLLER_VERSION=...
+gmake site-inputs SITE_IMAGE_REGISTRY=nvcr.io/<org> SITE_NVKE_CONTROLLER_VERSION=...
 # and in e2e-config.yaml, site.images.{controller,capi-provisioned}.repository
 # under nvcr.io/<org>
 ```
@@ -537,8 +547,8 @@ GHCR image, and nothing else on the node pulls at all.
 `site-inputs` builds that image from the checkout. nvkectl is built here too and
 is a client of the CWE it bootstraps, so the two have to be one commit; the
 newest CWE on GHCR predates #850 and rejects this checkout's nvkectl at
-"creating the site cluster". `SITE_CONTROLLER_BUILD=0` pulls
-`SITE_CONTROLLER_VERSION` as a published tag instead, for qualifying a release
+"creating the site cluster". `SITE_NVKE_CONTROLLER_BUILD=0` pulls
+`SITE_NVKE_CONTROLLER_VERSION` as a published tag instead, for qualifying a release
 once one is cut past #850.
 
 To stage a published nvkectl instead, set `SITE_CLI_BUILD=0` and name the
@@ -554,7 +564,7 @@ release and `sha-<commit>` for a commit between releases. It needs `oras` and a
 `docker login` to the registry:
 
 ```bash
-gmake site-inputs SITE_CLI_BUILD=0 SITE_CONTROLLER_VERSION=... \
+gmake site-inputs SITE_CLI_BUILD=0 SITE_NVKE_CONTROLLER_VERSION=... \
   SITE_CLI_VERSION=v0.1.0 SITE_CLI_REF=nvcr.io/<org>/nvkectl:v0.1.0-linux-amd64
 # and in e2e-config.yaml, site.nvkectl: <SITE_INPUTS>/nvkectl/nvkectl-linux-<arch>
 # and on the suite, -e2e.versions=...,cli=<version>
@@ -601,7 +611,7 @@ and `TELEPORT_IDENTITY_FILE`, which
 `.github/workflows/qualify-e2e.yml` obtains by joining with the
 repository's GitHub OIDC token — nothing is stored. The bot's login is `root`,
 so the workflow sets `FORGE_TELEPORT_LOGIN=root` and
-`FORGE_YTL_TELEPORT_LOGIN=root`, which each site's `teleportLogin` in
+`FORGE_SITE_2_TELEPORT_LOGIN=root`, which each site's `teleportLogin` in
 `environments/forge.yaml` reads. Unset is tsh's default.
 
 For a site whose jump host is *not* enrolled, set `JUMP_HOST_PASSWORD` and the

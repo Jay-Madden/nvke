@@ -15,13 +15,15 @@ the site-bootstrap and tenant-cluster pages below, which it will replace.
 | [overview/supported-platforms.md](overview/supported-platforms.md) | The Kubernetes versions, networking, infrastructure providers, node OS and tools this release supports |
 | [overview/preview-status.md](overview/preview-status.md) | What the preview supports and its known limitations |
 | [get-started/quickstart-local.md](get-started/quickstart-local.md) | Evaluate NVKE on one Linux host with mock-NICo |
+| [get-started/local-site.md](get-started/local-site.md) | The operator flow end to end on one machine: bootstrap a container node, install the management plane, create a workload cluster on simulated NICo |
 | [operate/plan-installation.md](operate/plan-installation.md) | What to decide and gather before installing |
-| [operate/build-node-images.md](operate/build-node-images.md) | Where NVKE's artifacts come from in NVKR, and writing the OS release resources |
+| [operate/build-node-images.md](operate/build-node-images.md) | Building node OS images, hosting their boot files over HTTP(S), checking downloads, and registering them for provisioning |
+| [operate/build-and-verify-node-image.md](operate/build-and-verify-node-image.md) | Building the reference node image from `os-image/`, booting it, and checking it with `nvke-os-image-check` |
 | [operate/prepare-nodes.md](operate/prepare-nodes.md) | Bringing the management cluster's nodes from first boot to what `nvkectl bootstrap site` requires |
 | [operate/bootstrap-management-cluster.md](operate/bootstrap-management-cluster.md) | Writing the site spec and running `nvkectl bootstrap site` |
-| [operate/install-management-plane-services.md](operate/install-management-plane-services.md) | Installing Cluster API, CAPNICo and the NVKE API and controllers |
 | [operate/provider-nico.md](operate/provider-nico.md) | Confirming the management plane can request machines from NICo, its credentials, and the NICo IDs a cluster request needs |
 | [operate/api-authentication.md](operate/api-authentication.md) | Turning on OIDC authentication for the NVKE API |
+| [workload-clusters/ovn-kubernetes.md](workload-clusters/ovn-kubernetes.md) | Building, self-hosting and deploying OVN-Kubernetes artifacts |
 | [workload-clusters/create.md](workload-clusters/create.md) | Creating a workload cluster |
 | [workload-clusters/access.md](workload-clusters/access.md) | Getting a workload cluster's admin kubeconfig, giving the customer access, and connecting with `kubectl` |
 | [workload-clusters/oidc.md](workload-clusters/oidc.md) | Making workload clusters accept tokens from the management plane and from your own OpenID Connect (OIDC) identity providers, and the identities they may not claim |
@@ -63,6 +65,7 @@ the site-bootstrap and tenant-cluster pages below, which it will replace.
 | [site-bootstrap/deploy-repository.md](site-bootstrap/deploy-repository.md) | The deploy repository and what it holds |
 | [site-bootstrap/infrastructure-providers.md](site-bootstrap/infrastructure-providers.md) | Installing Cluster API and an infrastructure provider on a site cluster |
 | [../cli/docs/sitespec.md](../cli/docs/sitespec.md) | Every field of the site spec file, with its type |
+| [../cli/docs/reference/README.md](../cli/docs/reference/README.md) | Every `nvkectl` command and flag, generated from the CLI itself |
 | [../cli/docs/bootstrap-troubleshooting.md](../cli/docs/bootstrap-troubleshooting.md) | Where a failed bootstrap leaves its evidence, how to read the error, common failures and when to re-run |
 
 ## Running tenant clusters
@@ -93,19 +96,24 @@ the site-bootstrap and tenant-cluster pages below, which it will replace.
 | [nktp/site-telemetry/verification.md](nktp/site-telemetry/verification.md) | Checking every telemetry signal end to end after an install |
 | [nktp/site-telemetry/troubleshooting.md](nktp/site-telemetry/troubleshooting.md) | Telemetry failures seen on management clusters, and their fixes |
 
-## Running NVKE telemetry pipelines (NKTP)
+## Running NVKE telemetry pipeline (NKTP)
 
 | Document | Contents |
 |---|---|
 | [nktp/getting-started.md](nktp/getting-started.md) | NKTP on any cluster: installing the chart, a first look, and what commonly needs changing |
-| [nktp/guides/send-telemetry.md](nktp/guides/send-telemetry.md) | For service owners: how a workload's logs, OTLP and Prometheus metrics reach NKTP |
+| [nktp/guides/send-telemetry.md](nktp/guides/send-telemetry.md) | For service owners: how a workload's logs, OTLP and Prometheus metrics reach NKTP, and adding a sidecar Collector |
+| [nktp/guides/enable-auto-instrumentation.md](nktp/guides/enable-auto-instrumentation.md) | A shared `Instrumentation` that injects OpenTelemetry agents into Java, Node.js, Python and .NET Pods |
+| [nktp/guides/enable-ebpf-instrumentation.md](nktp/guides/enable-ebpf-instrumentation.md) | Running OpenTelemetry eBPF Instrumentation (OBI) to trace requests in any language and send them to the node Collector |
 | [nktp/architecture/topology.md](nktp/architecture/topology.md) | The Collectors, how each signal flows to the backend, and how scraping is allocated |
 | [nktp/architecture/backpressure.md](nktp/architecture/backpressure.md) | How queues and the memory limiter behave when a Collector is saturated |
 | [nktp/architecture/self-telemetry.md](nktp/architecture/self-telemetry.md) | The sidecar that buffers each Collector's own telemetry, and how it samples traces |
-| [nktp/guides/size-resources.md](nktp/guides/size-resources.md) | Default requests and limits, and the footprint of a three-node cluster |
+| [nktp/guides/size-resources.md](nktp/guides/size-resources.md) | Default requests and limits, runtime memory targets, and sizing guidance |
 | [nktp/guides/configure-cert-manager.md](nktp/guides/configure-cert-manager.md) | What NKTP uses cert-manager for, and installing without it |
 | [nktp/guides/secure-gateway-export.md](nktp/guides/secure-gateway-export.md) | TLS and mTLS from the gateways and the watchdog to the backend |
 | [nktp/guides/configure-kubelet-metrics.md](nktp/guides/configure-kubelet-metrics.md) | Changing the kubelet scrapes, verifying kubelet certificates, and running beside kube-prometheus-stack |
+| [nktp/guides/restrict-monitor-file-access.md](nktp/guides/restrict-monitor-file-access.md) | Migrate monitor credentials before enabling file-access restrictions |
+| [nktp/guides/configure-persistent-queue.md](nktp/guides/configure-persistent-queue.md) | Keeping the watchdog and gateway exporter queues on a PersistentVolume across restarts |
+| [nktp/guides/enable-daemonset-log-checkpoints.md](nktp/guides/enable-daemonset-log-checkpoints.md) | Persisting the node Collector's log read positions so a restarted Collector resumes instead of skipping lines |
 | [nktp/guides/enable-host-process-metrics.md](nktp/guides/enable-host-process-metrics.md) | Per-process host metrics, the privileges they need, and their cardinality |
 | [nktp/components/node-collector.md](nktp/components/node-collector.md) | The node Collector (`daemonset`): OTLP endpoint, pod logs, journal, log classification and monitor credentials |
 | [nktp/components/gateways.md](nktp/components/gateways.md) | The logs, metrics and traces gateways (`gateway_*`) and their endpoints |
@@ -116,6 +124,7 @@ the site-bootstrap and tenant-cluster pages below, which it will replace.
 | [nktp/components/otel-lgtm.md](nktp/components/otel-lgtm.md) | The bundled development backend (`otel-lgtm`), its dashboards and settings |
 | [nktp/components/dependencies.md](nktp/components/dependencies.md) | The bundled Operator, CRDs, node-exporter and metrics-server |
 | [nktp/design-principles.md](nktp/design-principles.md) | Why the chart renders each Collector configuration exactly as written |
+| [nktp/designs/monitor-file-access.md](nktp/designs/monitor-file-access.md) | Why monitor file access remains enabled by default and how to restrict it |
 | [nktp/designs/target-allocation.md](nktp/designs/target-allocation.md) | Why every scraping Collector requires a Target Allocator |
 | [nktp/designs/kube-state-metrics.md](nktp/designs/kube-state-metrics.md) | The approaches considered for scaling kube-state-metrics collection |
 

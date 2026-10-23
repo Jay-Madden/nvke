@@ -52,7 +52,7 @@ func main() {
 	var secureMetrics bool
 	var enableHTTP2 bool
 	var metricsCertPath, metricsCertName, metricsCertKey string
-	var controllerEndpoint, controllerTokenFile string
+	var nvkeControllerEndpoint, nvkeControllerTokenFile string
 	var infraTemplateConfigMapName string
 
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metric endpoint binds to; 0 disables it.")
@@ -79,13 +79,13 @@ func main() {
 	flag.BoolVar(&enableHTTP2, "enable-http2", false, "Enable HTTP/2 for metrics")
 
 	flag.StringVar(
-		&controllerEndpoint,
+		&nvkeControllerEndpoint,
 		"nvke-controller-endpoint",
 		"",
 		"NVKE controller REST API base URL",
 	)
 	flag.StringVar(
-		&controllerTokenFile,
+		&nvkeControllerTokenFile,
 		"nvke-controller-token-file",
 		"",
 		"File containing the NVKE controller bearer token",
@@ -132,7 +132,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	controllerClient, err := configureController(controllerEndpoint, controllerTokenFile)
+	nvkeControllerClient, err := configureNVKEController(nvkeControllerEndpoint, nvkeControllerTokenFile)
 	if err != nil {
 		setupLog.Error(err, "configure NVKE controller access")
 		os.Exit(1)
@@ -160,7 +160,7 @@ func main() {
 
 	if err := (&controllers.NVKEClusterReconciler{
 		Client:                     mgr.GetClient(),
-		NVKEClient:                 controllerClient,
+		NVKEController:             nvkeControllerClient,
 		InfraTemplateConfigMapName: infraTemplateConfigMapName,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "NVKECluster")
@@ -184,8 +184,8 @@ func main() {
 	}
 }
 
-// configureController leaves reconciliation inactive unless an endpoint is supplied.
-func configureController(endpoint, tokenFile string) (controllers.ControllerClient, error) {
+// configureNVKEController leaves reconciliation inactive unless an endpoint is supplied.
+func configureNVKEController(endpoint, tokenFile string) (controllers.NVKEControllerClient, error) {
 	if endpoint == "" && tokenFile == "" {
 		return nil, nil
 	}

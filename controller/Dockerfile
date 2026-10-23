@@ -11,10 +11,10 @@
 # in closing it.
 #
 # Internal builds override these rather than BASE_REGISTRY, for example
-#   docker build --build-arg GOLANG_IMAGE=dockerhub.nvidia.com/golang:1.27.2@sha256:... .
+#   docker build --build-arg GOLANG_IMAGE=dockerhub.nvidia.com/golang:1.27.3@sha256:... .
 # A digest is content-addressed, so a mirror serving the same content answers
 # to the same digest.
-ARG GOLANG_IMAGE=docker.io/golang:1.27.2@sha256:820153096fda4de6ac1b7194d12e416b7dd8f4e9a33d17e0345b111b945162d8
+ARG GOLANG_IMAGE=docker.io/golang:1.27.3@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b
 ARG ALPINE_IMAGE=docker.io/alpine:3.24.2@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
 
 FROM ghcr.io/spiffe/k8s-spiffe-workload-jwt-exec-auth:1.0.0@sha256:e30e90774e5951f84eb6dfb36f972fead08b64c3bfdc0912c5b15f988e79de3a AS spiffe-jwt-exec-auth
@@ -83,6 +83,10 @@ LABEL org.opencontainers.image.licenses="Apache-2.0" \
       org.opencontainers.image.title="controller" \
       org.opencontainers.image.source="https://github.com/dsx-ai-factory/nvke" \
       org.opencontainers.image.description="NVKE Cloud Workflow Engine"
+
+# The nonroot uid distroless images use. The chart sets the same uid and
+# runAsNonRoot, which the kubelet can only verify against a numeric USER.
+USER 65532:65532
 
 EXPOSE 8080
 

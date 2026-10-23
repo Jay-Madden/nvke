@@ -348,8 +348,8 @@ func (d Stack) withDefaults() Stack {
 // under a name the suite is not configured to look for.
 //
 // These are two owners of one string: the deploy path, exported from the
-// controller version under test, and NKE_CONTROLLER_NAMESPACE and
-// NKE_CONTROLLER_SERVICE, which default to nke-controller. Nothing makes the
+// controller version under test, and NVKE_CONTROLLER_NAMESPACE and
+// NVKE_CONTROLLER_SERVICE, which default to nke-controller. Nothing makes the
 // two move together.
 //
 // Getting it wrong is expensive rather than obvious: the readiness probe
@@ -406,7 +406,7 @@ func controllerName() string { return controller.Service() }
 // spireAdminPath is the controller's SPIFFE ID below the trust domain. A name that does
 // not match what the deploy path installed leaves the controller denied every
 // authorization check, which reads as an RBAC fault rather than a naming one.
-func spireAdminPath() string { return "/nke-service/" + controllerName() }
+func spireAdminPath() string { return "/nvke-service/" + controllerName() }
 
 func (d Stack) validate() error {
 	var problems []string

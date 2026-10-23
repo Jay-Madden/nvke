@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/url"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -21,20 +22,22 @@ const (
 	InfraProviderNico = "nico"
 	// InfraProviderInfra is the API-facing name for the generic CAPI provider block.
 	InfraProviderInfra = "infra"
+	// InfraProviderLaunchLayer is the API-facing name for the LaunchLayer provider block.
+	InfraProviderLaunchLayer = "launchLayer"
 
 	SpireAttestationMethodTPM       SpireAttestationMethod = "tpm"
 	SpireAttestationMethodJoinToken SpireAttestationMethod = "joinToken"
 	SpireAttestationMethodDSXIMDS   SpireAttestationMethod = "dsxImds"
 
-	NodeAgentExternalTLSCertPath = "/etc/nke/node-agent-client-tls/tls.crt"
-	NodeAgentExternalTLSKeyPath  = "/etc/nke/node-agent-client-tls/tls.key"
-	NodeAgentExternalTLSCAPath   = "/etc/nke/node-agent-client-tls/ca.crt"
+	NodeAgentExternalTLSCertPath = "/etc/nvke/node-agent-client-tls/tls.crt"
+	NodeAgentExternalTLSKeyPath  = "/etc/nvke/node-agent-client-tls/tls.key"
+	NodeAgentExternalTLSCAPath   = "/etc/nvke/node-agent-client-tls/ca.crt"
 	// NodeAgentExternalTLSNVKECertPath and ...KeyPath are an optional second client
 	// identity whose URI SAN is the new-form controller URN. When present, nodes whose
 	// agent speaks the new form are dialed with it; otherwise the first identity is
 	// used for every node.
-	NodeAgentExternalTLSNVKECertPath = "/etc/nke/node-agent-client-tls/nvke-tls.crt"
-	NodeAgentExternalTLSNVKEKeyPath  = "/etc/nke/node-agent-client-tls/nvke-tls.key"
+	NodeAgentExternalTLSNVKECertPath = "/etc/nvke/node-agent-client-tls/nvke-tls.crt"
+	NodeAgentExternalTLSNVKEKeyPath  = "/etc/nvke/node-agent-client-tls/nvke-tls.key"
 	NodeAgentConfigPath              = "/etc/default/nke-agent"
 	NodeAgentControllerCAPath        = "/etc/nke/controller-ca.crt"
 )
@@ -132,6 +135,11 @@ type Config struct {
 
 	// DBQueryLogLevel is the level of logs to output for all database queries (debug|info)
 	DBQueryLogLevel string `env:"DB_QUERY_LOG_LEVEL" default:"debug"`
+
+	// DBQueryLogValues logs each query with its values instead of a "?" for each,
+	// and logs PostgreSQL error messages. A query can carry operator-supplied
+	// content, and a message can repeat a rejected value, so it is off by default.
+	DBQueryLogValues bool `env:"DB_QUERY_LOG_VALUES" default:"false"`
 
 	// DBMaxOpenConnections is the maximum number of open connections to the database
 	DBMaxOpenConnections int `env:"DB_MAX_OPEN_CONNECTIONS" default:"32"`
@@ -460,11 +468,19 @@ type TeleportConfig struct {
 	DefaultWorkerPoolEnabled bool `env:"DEFAULT_WORKER_POOL_ENABLED" default:"false"`
 
 	// ManagedByLabelValue is the value of the Teleport "managed-by" label this
-	// controller stamps on tokens it creates, and the value ownership checks
-	// (IsOwnedByController) compare incoming tokens against. The chart default
-	// is for new sites; a site that exists pins its old value
-	// ("nke-cloud-workflow-engine"), or stops recognizing the tokens it owns.
+	// controller stamps on tokens it creates. It is the written value only;
+	// ownership checks go through OwnershipManagedByValues, which also accepts
+	// AcceptedManagedByLabelValues.
 	ManagedByLabelValue string `controllerconfig:"teleport.managedByLabelValue"`
+
+	// AcceptedManagedByLabelValues are additional "managed-by" values this
+	// controller still owns without writing: the spellings its own earlier
+	// releases stamped. Moving ManagedByLabelValue does not relabel the tokens
+	// and nodes already carrying the old one -- a Teleport token's labels are
+	// fixed at mint, a node's at join -- so without this the move disowns every
+	// one of them, and nothing reaps what nothing owns. List the previous value
+	// here for as long as any resource may still carry it.
+	AcceptedManagedByLabelValues []string `controllerconfig:"teleport.acceptedManagedByLabelValues"`
 
 	// TokenNamePrefix prefixes the deterministic Teleport TPM join token name
 	// this controller mints for a node.
@@ -473,6 +489,21 @@ type TeleportConfig struct {
 	// ResourceGroupLabelValue is the value of the Teleport "resource-group"
 	// label stamped on tokens and node userdata. Existing sites pin "nke".
 	ResourceGroupLabelValue string `controllerconfig:"teleport.resourceGroupLabelValue"`
+}
+
+// OwnershipManagedByValues returns every "managed-by" value this controller
+// owns: the one it writes first, then the ones it only accepts. Duplicates and
+// blanks are dropped, so a deployment that lists its current value among the
+// accepted ones gets the same answer as one that does not.
+func (c TeleportConfig) OwnershipManagedByValues() []string {
+	values := make([]string, 0, len(c.AcceptedManagedByLabelValues)+1)
+	for _, v := range append([]string{c.ManagedByLabelValue}, c.AcceptedManagedByLabelValues...) {
+		v = strings.TrimSpace(v)
+		if v != "" && !slices.Contains(values, v) {
+			values = append(values, v)
+		}
+	}
+	return values
 }
 
 // NodePoolTeleportDefault returns the teleport default for a node pool based on its role.

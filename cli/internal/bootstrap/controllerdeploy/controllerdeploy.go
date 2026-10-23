@@ -33,7 +33,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
-	"slices"
 	"strconv"
 	"strings"
 	"text/template"
@@ -170,7 +169,8 @@ const (
 	// (profilesDir). Set explicitly rather than left to the chart's empty
 	// default, so profilesDir names the empty /profiles the controller image
 	// ships rather than resolving somewhere else. nvkectl deploys no profiles
-	// into it; a site gets them from its deploy repository.
+	// into it unless Config.ProfilesImage is set, which copies that image's
+	// /profiles tree in; a site otherwise gets them from its deploy repository.
 	profilesPath = "/profiles"
 )
 
@@ -207,7 +207,7 @@ type oidcProviders struct {
 // Config describes a controller deployment.
 type Config struct {
 	// CWEImage is the image reference to deploy. Defaults to nke-controller:latest,
-	// the local build's tag, from the bootstrap manifest. NVKECTL_CONTROLLER_IMAGE
+	// the local build's tag, from the bootstrap manifest. NVKECTL_NVKE_CONTROLLER_IMAGE
 	// overrides it, for example with the image .github/workflows/image-nvcr.yml
 	// publishes.
 	CWEImage string
@@ -239,6 +239,17 @@ type Config struct {
 	// When set, the server is also published on a NodePort: the hosts that
 	// attest are outside the cluster, and a ClusterIP is not a route they have.
 	TPMEKFingerprints []string
+
+	// ProfilesImage is an OCI content image holding the OS and config profiles
+	// CWE reads, mounted at PROFILES_DIR by the chart's init container. Empty
+	// deploys CWE with the controller image's empty /profiles, which is enough
+	// for hosts that already exist and not for nodes CAPNICo creates: those need
+	// the profiles a cluster request names.
+	//
+	// A reference without a registry is side-loaded from the local image store,
+	// like CWEImage. The chart sets no pull policy on it, so it has to carry a
+	// tag other than latest, or a digest, or the cluster tries to pull it.
+	ProfilesImage string
 
 	// SPIREExternalAddress is the address nodes created by CAPNICo use to reach
 	// the SPIRE server. CWE writes it into each node's userdata, so it has to
@@ -343,7 +354,7 @@ func (c Config) TPMAttestorEnabled() bool {
 // bootstrapengine.DefaultConfig's env-driven shape.
 func DefaultConfig() Config {
 	return Config{
-		CWEImage: envOr("NVKECTL_CONTROLLER_IMAGE", defaultImage(manifest.ComponentController, manifest.ImageController)),
+		CWEImage: envOr("NVKECTL_NVKE_CONTROLLER_IMAGE", defaultImage(manifest.ComponentController, manifest.ImageController)),
 		// No cluster-name variable of its own: the bootstrap cluster has one
 		// name, NVKECTL_BOOTSTRAP_CLUSTER_NAME, and SPIRE is told that one.
 		// Callers set SPIFFEClusterName; an empty trust domain is derived from
@@ -351,30 +362,33 @@ func DefaultConfig() Config {
 		SPIFFETrustDomain: getenv("NVKECTL_SPIFFE_TRUST_DOMAIN"),
 
 		ProvisionedProviderImage: envOr("NVKECTL_CAPI_PROVISIONED_IMAGE", defaultImage(manifest.ComponentProvisioned, manifest.ImageManager)),
-		CWEPort:                  envPort("NVKECTL_CONTROLLER_PORT", DefaultCWEPort),
+		CWEPort:                  envPort("NVKECTL_NVKE_CONTROLLER_PORT", DefaultCWEPort),
+		// Added after the rename, so it has no NKECTL_ name to fall back to and
+		// is not in Settings.
+		ProfilesImage: os.Getenv(ProfilesImageEnv),
 
-		HelmTimeout:  envDuration("NVKECTL_CONTROLLER_HELM_TIMEOUT", 5*time.Minute),
-		ReadyTimeout: envDuration("NVKECTL_CONTROLLER_READY_TIMEOUT", 5*time.Minute),
+		HelmTimeout:  envDuration("NVKECTL_NVKE_CONTROLLER_HELM_TIMEOUT", 5*time.Minute),
+		ReadyTimeout: envDuration("NVKECTL_NVKE_CONTROLLER_READY_TIMEOUT", 5*time.Minute),
 
-		TemporalChartRef:  getenv("NVKECTL_CONTROLLER_TEMPORAL_CHART"),
-		SPIREChartRef:     getenv("NVKECTL_CONTROLLER_SPIRE_CHART"),
-		SPIRECRDsChartRef: getenv("NVKECTL_CONTROLLER_SPIRE_CRDS_CHART"),
+		TemporalChartRef:  getenv("NVKECTL_NVKE_CONTROLLER_TEMPORAL_CHART"),
+		SPIREChartRef:     getenv("NVKECTL_NVKE_CONTROLLER_SPIRE_CHART"),
+		SPIRECRDsChartRef: getenv("NVKECTL_NVKE_CONTROLLER_SPIRE_CRDS_CHART"),
 	}
 }
 
-// Settings is every environment variable this package reads. Each is also
-// read under the name it had while the binary was called nkectl, for one
-// release; see envalias.
+// Settings is every environment variable this package reads. Each one that is
+// not NVKECTL_NVKE_* is also read under the name it had while the binary was
+// called nkectl, for one release; see envalias.
 var Settings = []string{
-	"NVKECTL_CONTROLLER_IMAGE",
+	"NVKECTL_NVKE_CONTROLLER_IMAGE",
 	"NVKECTL_CAPI_PROVISIONED_IMAGE",
 	"NVKECTL_SPIFFE_TRUST_DOMAIN",
-	"NVKECTL_CONTROLLER_PORT",
-	"NVKECTL_CONTROLLER_HELM_TIMEOUT",
-	"NVKECTL_CONTROLLER_READY_TIMEOUT",
-	"NVKECTL_CONTROLLER_TEMPORAL_CHART",
-	"NVKECTL_CONTROLLER_SPIRE_CHART",
-	"NVKECTL_CONTROLLER_SPIRE_CRDS_CHART",
+	"NVKECTL_NVKE_CONTROLLER_PORT",
+	"NVKECTL_NVKE_CONTROLLER_HELM_TIMEOUT",
+	"NVKECTL_NVKE_CONTROLLER_READY_TIMEOUT",
+	"NVKECTL_NVKE_CONTROLLER_TEMPORAL_CHART",
+	"NVKECTL_NVKE_CONTROLLER_SPIRE_CHART",
+	"NVKECTL_NVKE_CONTROLLER_SPIRE_CRDS_CHART",
 }
 
 // DeprecatedSettings returns, sorted by old name, every setting in Settings
@@ -383,25 +397,6 @@ var Settings = []string{
 // the point DefaultConfig runs.
 func DeprecatedSettings() []envalias.Renamed {
 	return envalias.Deprecated(Settings...)
-}
-
-// RemovedSettings returns, sorted by old name, every NKECTL_CWE_* variable that
-// is set. nkectl cli/v0.1.x read the NVKECTL_CONTROLLER_* settings under those
-// names; DefaultConfig does not read them. New is the setting that replaces
-// each one.
-func RemovedSettings() []envalias.Renamed {
-	var found []envalias.Renamed
-	for _, name := range Settings {
-		suffix, ok := strings.CutPrefix(name, "NVKECTL_CONTROLLER_")
-		if !ok {
-			continue
-		}
-		if old := "NKECTL_CWE_" + suffix; os.Getenv(old) != "" {
-			found = append(found, envalias.Renamed{Old: old, New: name})
-		}
-	}
-	slices.SortFunc(found, func(a, b envalias.Renamed) int { return strings.Compare(a.Old, b.Old) })
-	return found
 }
 
 // getenv returns the setting's value, or, when it is unset or empty, the value
@@ -725,6 +720,11 @@ func (e *Engine) Deploy(ctx context.Context, kubeconfigPath string, cfg Config) 
 		"--set-string", "supportedInfraProviders=" + supportedInfraProviders(cfg),
 		"--set", fmt.Sprintf("service.port=%d", cwePort),
 	}
+	profilesArgs, err := profilesImageArgs(cfg)
+	if err != nil {
+		return err
+	}
+	cweArgs = append(cweArgs, profilesArgs...)
 	cweArgs = append(cweArgs, cweEnvArgs(cfg)...)
 	if cfg.NicoInfrastructure {
 		cweArgs = append(cweArgs, "--set-string", "secrets.dgxcTenantCredSecretName="+dgxcTenantSecret)
@@ -799,6 +799,53 @@ func (e *Engine) applyReleases(ctx context.Context, kubeconfigPath, path string)
 		return fmt.Errorf("controllerdeploy: applying the release manifests at %s: %w\n%s", path, err, out)
 	}
 	return nil
+}
+
+// ProfilesImageEnv names the environment variable that sets Config.ProfilesImage.
+const ProfilesImageEnv = "NVKECTL_NVKE_CONTROLLER_PROFILES_IMAGE"
+
+// ValidateProfilesImage reports an error when image cannot be used as the
+// profiles image. An empty image is valid: no profiles image is deployed. The
+// check is cheap and needs no cluster, so callers run it before anything is
+// built.
+func ValidateProfilesImage(image string) error {
+	if image == "" {
+		return nil
+	}
+	// A colon with nothing after it is not a tag at all, and splitImageRef would
+	// report it as an empty one that the latest check below lets through.
+	if repo, _, _ := strings.Cut(image, "@"); strings.HasSuffix(repo, ":") {
+		return fmt.Errorf("controllerdeploy: the profiles image %q (%s) has an empty tag: nothing follows the colon", image, ProfilesImageEnv)
+	}
+	_, tag, digest := splitImageRef(image)
+	// splitImageRef reports an untagged reference as latest. Kubernetes pulls
+	// latest unconditionally, and the chart gives this image no pull policy to
+	// override that, so a side-loaded image would never be found.
+	if digest == "" && tag == "latest" {
+		return fmt.Errorf("controllerdeploy: the profiles image %q (%s) must carry a tag other than latest, or a digest: "+
+			"the chart sets no pull policy on it, so a latest tag makes the cluster pull it instead of using the "+
+			"side-loaded copy", image, ProfilesImageEnv)
+	}
+	return nil
+}
+
+// profilesImageArgs turns Config.ProfilesImage into the chart values that make
+// its init container copy the profiles into place. Nothing is added when no
+// image is set.
+func profilesImageArgs(cfg Config) ([]string, error) {
+	if cfg.ProfilesImage == "" {
+		return nil, nil
+	}
+	if err := ValidateProfilesImage(cfg.ProfilesImage); err != nil {
+		return nil, err
+	}
+	repo, tag, digest := splitImageRef(cfg.ProfilesImage)
+	return []string{
+		"--set", "profiles.image.enabled=true",
+		"--set-string", "profiles.image.repository=" + repo,
+		"--set-string", "profiles.image.tag=" + tag,
+		"--set-string", "profiles.image.digest=" + digest,
+	}, nil
 }
 
 // cweEnvArgs renders the settings the controller reads from its own environment as helm
@@ -1148,7 +1195,7 @@ func spireInstallArgs(cfg Config, chart manifest.Chart, valuesPath, clusterName,
 		"--values", valuesPath,
 		"--set-string", "global.spire.clusterName="+clusterName,
 		"--set-string", "global.spire.trustDomain="+trustDomain,
-		"--set-string", prefix+".adminIDs[0]=spiffe://"+trustDomain+"/nke-service/"+cweReleaseName,
+		"--set-string", prefix+".adminIDs[0]=spiffe://"+trustDomain+"/nvke-service/"+cweReleaseName,
 		// Both halves of the two agreements the controller depends on. See the constants.
 		"--set-string", prefix+".controllerManager.className="+spireControllerManagerClass,
 		// --set, not --set-string: the chart's schema types these as integers.

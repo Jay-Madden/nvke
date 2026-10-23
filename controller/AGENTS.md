@@ -202,6 +202,7 @@ environment.
 |----------|---------|-------------|
 | `CONTROLLER_CONFIG_PATH` | (required) | The `nke-controller-config` file. The chart sets it to the mounted ConfigMap; `make run` sets it to `hack/local-controller-config.yaml`. Unset, missing or invalid is a startup failure. |
 | `LOG_LEVEL` | `info` | Log level (debug/info/warn/error) |
+| `DB_QUERY_LOG_VALUES` | `false` | Log each database query with its values, and PostgreSQL error messages. Off, a query is logged with a `?` for each value and an error by its code, because a query can carry operator-supplied content. |
 | `DB_CONNECTION_STRING` | `postgres://...` | PostgreSQL connection string |
 | `AUTH_CONFIG_PATH` | (unset) | API authentication config file. Unset disables authentication entirely, which is what `make run` gets. Set but unreadable is a startup failure, never "disabled". |
 
@@ -225,7 +226,7 @@ Preferred day-to-day path is CAPI + Tilt (see `README.md` in this directory).
 1. Start local Temporal: `temporal server start-dev`
 2. Start PostgreSQL (see above)
 3. Install the release CRDs and the fixture releases into the cluster in `KUBECONFIG`.
- CWE resolves every OS image from them, so provisioning fails without them:
+ CWE exits at startup without the CRDs, and provisioning fails without the releases:
  ```bash
  make releases-install
  ```
@@ -312,7 +313,7 @@ make test
 These run against a live CWE deployment:
 ```bash
 cd integration-test
-NKE_CONTROLLER_API_URL=http://localhost:8080/api go test -tags integration_test -v -timeout=3h
+NVKE_CONTROLLER_API_URL=http://localhost:8080/api go test -tags integration_test -v -timeout=3h
 ```
 
 ## Temporal Workflows

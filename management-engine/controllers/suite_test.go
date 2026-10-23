@@ -79,7 +79,7 @@ func controllerCaseSet(description, dirPrefix string, defineSteps func(*fixture.
 			tc.Client = client.WithFieldOwner(tc.Client, "management-engine-envtest")
 			Expect(tc.CreateObjects(ctx)).To(Succeed())
 			backend := fake.New()
-			if input, exists := tc.Input("input_controller.yaml"); exists {
+			if input, exists := tc.Input("input_nvke_controller.yaml"); exists {
 				Expect(backend.SeedFromYAML(input)).To(Succeed())
 			}
 			if status, exists := tc.Input("input_status.yaml"); exists {
@@ -90,18 +90,18 @@ func controllerCaseSet(description, dirPrefix string, defineSteps func(*fixture.
 			}
 			server := httptest.NewServer(backend.Handler())
 			DeferCleanup(server.Close)
-			controllerClient, err := nvkecontroller.New(nvkecontroller.Config{Endpoint: server.URL})
+			nvkeControllerClient, err := nvkecontroller.New(nvkecontroller.Config{Endpoint: server.URL})
 			Expect(err).NotTo(HaveOccurred())
-			tc.AddGolden("expected_controller.yaml", func(context.Context) (string, error) {
+			tc.AddGolden("expected_nvke_controller.yaml", func(context.Context) (string, error) {
 				return backend.Dump()
 			})
-			setupWithManager(ctx, tc, controllerClient)
+			setupWithManager(ctx, tc, nvkeControllerClient)
 		},
 		DefineSteps: defineSteps,
 	}
 }
 
-func setupWithManager(ctx SpecContext, tc *fixture.Case, controllerClient ControllerClient) {
+func setupWithManager(ctx SpecContext, tc *fixture.Case, nvkeControllerClient NVKEControllerClient) {
 	mgr, err := ctrl.NewManager(tc.Config, ctrl.Options{
 		Scheme:     tc.Scheme,
 		Metrics:    metricsserver.Options{BindAddress: "0"},
@@ -110,7 +110,7 @@ func setupWithManager(ctx SpecContext, tc *fixture.Case, controllerClient Contro
 	Expect(err).NotTo(HaveOccurred())
 	reconciler := &NVKEClusterReconciler{
 		Client:                     mgr.GetClient(),
-		NVKEClient:                 controllerClient,
+		NVKEController:             nvkeControllerClient,
 		PollInterval:               pollInterval,
 		InfraTemplateConfigMapName: "infra-template",
 	}

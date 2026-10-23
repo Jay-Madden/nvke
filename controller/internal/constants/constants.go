@@ -14,6 +14,7 @@ const (
 	TeardownClusterWorkflowPrefix      = "teardown-cluster-"
 	EnableEtcdEncryptionWorkflowPrefix = "enable-etcd-encryption-"
 	EnableOIDCWorkflowPrefix           = "enable-oidc-"
+	UpdateSpireServerWorkflowPrefix    = "update-spire-server-"
 
 	EtcdEncryptionKeySecretPrefix     = "etcd-encryption-key-"
 	EtcdEncryptionKeyFieldActive      = "active"
@@ -31,6 +32,7 @@ const (
 	TeardownNodeWorkflowType         = "TeardownNode"
 	EnableEtcdEncryptionWorkflowType = "EnableEtcdEncryption"
 	EnableOIDCWorkflowType           = "EnableOIDC"
+	UpdateSpireServerWorkflowType    = "UpdateSpireServer"
 
 	RebootNodeWorkflowPrefix       = "reboot-node-"
 	RebootNodeUptimeWorkflowPrefix = "reboot-node-uptime-"
@@ -80,6 +82,7 @@ const (
 	// constants here. The NICo manager retains its existing identity when the
 	// controller starts managing DSX IMDS entries too, avoiding SSA ownership churn.
 	FieldManagerNicoSpiffe        = "nico-tpm-spiffe-controller"
+	FieldManagerLaunchLayerSpiffe = "launchlayer-spiffe-controller"
 	FieldManagerMachineSpireEntry = "machine-spire-entry-controller"
 
 	LabelValueTerminateStatusInProgress = "InProgress"
