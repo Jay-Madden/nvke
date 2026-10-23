@@ -17,7 +17,7 @@ types, generated CRDs, controller-manager runtime, and tenant API contract gener
 
 ## Development
 
-See [Development](DEVELOPMENT.md) for setup, Tilt, tests, and scaffolding.
+See [API generation](DEVELOPMENT.md) for internal CRDs and public tenant contracts.
 Repository-wide guidance lives in [development conventions](../docs/development.md)
 and the [workspace guide](../docs/go-workspace.md).
 Run commands below from `management-engine/`.
@@ -27,7 +27,6 @@ make build test lint
 make generate manifests # after API or RBAC changes
 git diff --exit-code -- apis/v1 config/crd/bases config/rbac/role.yaml chart # check generated-file drift
 make test-controller # controller integration tests (envtest)
-make test-install # requires a prepared environment without Tilt
 make -C .. chart-crds # after changing MachineImage, ClusterRelease, or NodePoolRelease
 make -C .. chart-crds-check # verify the NVKE controller chart's generated CRDs
 make chart-check # generate, lint, and render the management-engine chart
@@ -35,7 +34,6 @@ make chart-check # generate, lint, and render the management-engine chart
 
 For a drift check, start with a clean working tree before regeneration.
 `make test` includes `test-controller`; the separate command runs that suite alone.
-See [installation test setup](DEVELOPMENT.md#tests) before running `test-install`.
 
 ### Tilt provider
 

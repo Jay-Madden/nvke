@@ -68,7 +68,7 @@ The gateway and gRPC server can remain in one process and Deployment.
 ## Generate and test
 
 Change the internal Go types, maintained proto, or configuration and regenerate.
-For internal type changes, first [regenerate the CRD](../../DEVELOPMENT.md#build-and-tests).
+For internal type changes, first [regenerate the CRD](../../DEVELOPMENT.md#internal-kubernetes-api).
 From `management-engine`:
 
 ```sh
