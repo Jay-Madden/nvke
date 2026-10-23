@@ -425,12 +425,13 @@ func TestDeploy_ControllerValuesCarryOIDCProviders(t *testing.T) {
 	}
 
 	cfg := testConfig(t)
+	usernamePrefix := "corp:"
 	cfg.OIDCProviders = []sitespec.OIDCProvider{{
 		Name:           "corp",
 		IssuerURL:      "https://login.example.com",
 		Audiences:      []string{"nvke"},
 		UsernameClaim:  "email",
-		UsernamePrefix: "corp:",
+		UsernamePrefix: &usernamePrefix,
 		CABundle:       "-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----\n",
 		DiscoveryURL:   "https://identity.example.com/.well-known/openid-configuration",
 	}}
@@ -486,6 +487,28 @@ func TestDeploy_OmitsUnsetOIDCDiscoveryURL(t *testing.T) {
 	extra := runner.extraValuesFiles[cweReleaseName]
 	require.Len(t, extra, 2)
 	assert.NotContains(t, extra[1], "discoveryURL:")
+}
+
+// TestDeploy_EmptyOIDCUsernamePrefix verifies Helm receives an explicit empty username prefix.
+func TestDeploy_EmptyOIDCUsernamePrefix(t *testing.T) {
+	cfg := testConfig(t)
+	usernamePrefix := ""
+	cfg.OIDCProviders = []sitespec.OIDCProvider{{Name: "corp", IssuerURL: "https://login.example.com", UsernamePrefix: &usernamePrefix}}
+	runner := &fakeRunner{}
+	require.NoError(t, New(runner, nil).Deploy(context.Background(), "/tmp/kubeconfig", cfg))
+	extra := runner.extraValuesFiles[cweReleaseName]
+	require.Len(t, extra, 2)
+	var rendered struct {
+		OIDC struct {
+			Providers []struct {
+				UsernamePrefix *string `yaml:"usernamePrefix"`
+			} `yaml:"providers"`
+		} `yaml:"oidc"`
+	}
+	require.NoError(t, yaml.Unmarshal([]byte(extra[1]), &rendered))
+	require.Len(t, rendered.OIDC.Providers, 1)
+	require.NotNil(t, rendered.OIDC.Providers[0].UsernamePrefix)
+	assert.Empty(t, *rendered.OIDC.Providers[0].UsernamePrefix)
 }
 
 // TestDeploy_InstallsPostgresFromTheEmbeddedChart: Postgres comes from the
