@@ -436,6 +436,7 @@ func resolveNodePoolRequest(clusterID uuid.UUID, pool *internalv1.NodePool) (api
 		DesiredNodeCount:            int(*pool.Replicas),
 		NodeNamePrefix:              string(pool.Name),
 		ProvisioningMonitorDisabled: new(true),
+		SystemReservedMemory:        "1Gi",
 	}
 	if params := pool.UserParams; params != nil {
 		request.NodeLabels = make(map[string]string, len(params.Labels))
@@ -504,6 +505,9 @@ var nvkeClusterOwnedConditions = []string{
 var nvkeControllerNegativeConditionTypes = []string{
 	internalv1.NVKEControllerProvisioningCondition,
 	internalv1.NVKEControllerDeletingCondition,
+	internalv1.NVKEControllerControlPlaneUpgradingCondition,
+	internalv1.NVKEControllerCPNodesRecyclingCondition,
+	internalv1.NVKEControllerUpdateFailedCondition,
 }
 
 func propagateNVKEControllerConditions(cluster *internalv1.NVKECluster, observedCluster *api.Cluster) {
@@ -544,13 +548,19 @@ func setNVKEControllerCondition(target conditions.Setter, conditionType string, 
 		status = metav1.ConditionUnknown
 		reason = internalv1.NotYetReportedReason
 	}
-	conditions.Set(target, metav1.Condition{
+	condition := metav1.Condition{
 		Type:               conditionType,
 		Status:             status,
 		LastTransitionTime: metav1.NewTime(child.LastTransitionTime),
 		Reason:             reason,
 		Message:            child.Message,
-	})
+	}
+	// Suppress healthy source messages so CAPI summaries only report problems.
+	priority := conditions.GetDefaultMergePriorityFunc(nvkeControllerNegativeConditionTypes...)
+	if priority(condition) == conditions.InfoMergePriority {
+		condition.Message = ""
+	}
+	conditions.Set(target, condition)
 }
 
 func setNodePoolConditions(pool *internalv1.NodePoolStatus, generation int64) error {
@@ -720,6 +730,7 @@ func resolveControllerClass(class internalv1.ResourceName, request *api.CreateCl
 				"echo success > /run/cluster-api/bootstrap-success.complete",
 			},
 		},
+		SystemReservedMemory: "1Gi",
 	}
 	return nil
 }

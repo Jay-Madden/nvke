@@ -21,6 +21,7 @@ requests:
     name: workers
     nodeNamePrefix: workers
     provisioningMonitorDisabled: true
+    systemReservedMemory: 1Gi
   method: POST
   path: /api/nodePools
 - method: DELETE

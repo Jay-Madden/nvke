@@ -21,6 +21,7 @@ requests:
         - mkdir -p /run/cluster-api
         - echo success > /run/cluster-api/bootstrap-success.complete
       provisioningMonitorDisabled: true
+      systemReservedMemory: 1Gi
     controlPlaneKubernetesVersion: 1.36.1
     etcdEncrypted: true
     infra:
