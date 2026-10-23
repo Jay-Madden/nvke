@@ -23,10 +23,15 @@ clusters:
         kind: DockerMachineTemplate
         spec:
           template:
-            metadata:
-              annotations:
-                cluster.x-k8s.io/paused: "true"
-            spec: {}
+            metadata: {}
+            spec:
+              customImage: cwe-capd-kindest-node:local
+              extraMounts:
+              - containerPath: /var/run/docker.sock
+                hostPath: /var/run/docker.sock
+      preKubeadmCommands:
+      - mkdir -p /run/cluster-api
+      - echo success > /run/cluster-api/bootstrap-success.complete
     provisioningMonitorDisabled: true
   controlPlaneKubernetesVersion: 1.36.1
   createdAt: "0001-01-01T00:00:00Z"
@@ -38,7 +43,6 @@ clusters:
       kind: DockerCluster
       metadata:
         labels:
-          site-id: 11111111-1111-4111-8111-111111111111
           vpc-id: 22222222-2222-4222-8222-222222222222
       spec: {}
   name: cluster-1-default-mgmt-eng
@@ -77,8 +81,6 @@ nodePools:
               cluster.x-k8s.io/paused: "true"
             labels:
               instance-type: 33333333-3333-4333-8333-333333333333
-              site-id: 11111111-1111-4111-8111-111111111111
-              ssh-key-group-id: 66666666-6666-4666-8666-666666666666
               vpc-id: 22222222-2222-4222-8222-222222222222
               vpc-prefix-id: 55555555-5555-4555-8555-555555555555
           spec: {}
@@ -100,10 +102,15 @@ requests:
           kind: DockerMachineTemplate
           spec:
             template:
-              metadata:
-                annotations:
-                  cluster.x-k8s.io/paused: "true"
-              spec: {}
+              metadata: {}
+              spec:
+                customImage: cwe-capd-kindest-node:local
+                extraMounts:
+                - containerPath: /var/run/docker.sock
+                  hostPath: /var/run/docker.sock
+        preKubeadmCommands:
+        - mkdir -p /run/cluster-api
+        - echo success > /run/cluster-api/bootstrap-success.complete
       provisioningMonitorDisabled: true
     controlPlaneKubernetesVersion: 1.36.1
     etcdEncrypted: true
@@ -113,7 +120,6 @@ requests:
         kind: DockerCluster
         metadata:
           labels:
-            site-id: 11111111-1111-4111-8111-111111111111
             vpc-id: 22222222-2222-4222-8222-222222222222
         spec: {}
     name: cluster-1-default-mgmt-eng
@@ -136,8 +142,6 @@ requests:
                 cluster.x-k8s.io/paused: "true"
               labels:
                 instance-type: 33333333-3333-4333-8333-333333333333
-                site-id: 11111111-1111-4111-8111-111111111111
-                ssh-key-group-id: 66666666-6666-4666-8666-666666666666
                 vpc-id: 22222222-2222-4222-8222-222222222222
                 vpc-prefix-id: 55555555-5555-4555-8555-555555555555
             spec: {}

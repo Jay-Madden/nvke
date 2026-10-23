@@ -8,5 +8,6 @@ namePrefix: management-engine-
 resources:
 - namespace.yaml
 - manager.yaml
+- infra-templates.yaml
 - ../crd
 - ../rbac

@@ -197,22 +197,6 @@ dev-down: ## Delete this environment's clusters and local credentials; stop Tilt
 test-install: ## Test the runtime in the prepared environment; run before Tilt.
 	IMG="$(IMG)" bash hack/dev.sh test
 
-.PHONY: dev-nvke-controller dev-nvke-controller-up dev-nvke-controller-down test-nvke-controller-integration
-dev-nvke-controller dev-nvke-controller-up dev-nvke-controller-down test-nvke-controller-integration: DEV_NAME = nvke-controller
-dev-nvke-controller dev-nvke-controller-up dev-nvke-controller-down test-nvke-controller-integration: TILT_PORT = 10353
-dev-nvke-controller: ## Start the NVKE controller and management-engine in one Tilt dashboard on dedicated Kind clusters.
-	CAPI_VERSION="$(CAPI_VERSION)" bash hack/dev.sh controller-up
-	bash hack/dev.sh controller-tilt
-
-dev-nvke-controller-up: ## Prepare the dedicated controller integration environment without starting Tilt.
-	CAPI_VERSION="$(CAPI_VERSION)" bash hack/dev.sh controller-up
-
-test-nvke-controller-integration: ## Run the Ginkgo integration suite against the running combined environment.
-	bash hack/dev.sh controller-test
-
-dev-nvke-controller-down: ## Remove the dedicated controller environment and credentials; stop Tilt first.
-	bash hack/dev.sh controller-down
-
 .PHONY: install install-state
 install: install-state ## Install the datastore resources using STATE_CONTEXT.
 install-state: require-state-context manifests-state kustomize ## Install CRDs and identity/RBAC on the datastore cluster.

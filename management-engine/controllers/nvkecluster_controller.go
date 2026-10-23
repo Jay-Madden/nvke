@@ -217,9 +217,6 @@ func infraTemplateVariables(cluster *internalv1.NVKECluster, pool *internalv1.No
 	if cluster.Spec.Network != nil && cluster.Spec.Network.VPCID != "" {
 		variables["VPCID"] = cluster.Spec.Network.VPCID
 	}
-	if cluster.Spec.SiteID != "" {
-		variables["SiteID"] = cluster.Spec.SiteID
-	}
 	if pool == nil {
 		return variables
 	}
@@ -228,9 +225,6 @@ func infraTemplateVariables(cluster *internalv1.NVKECluster, pool *internalv1.No
 	}
 	if pool.VPCPrefixID != "" {
 		variables["VPCPrefixID"] = pool.VPCPrefixID
-	}
-	if pool.SSHKeyGroupID != "" {
-		variables["SSHKeyGroupID"] = pool.SSHKeyGroupID
 	}
 	return variables
 }
@@ -692,14 +686,22 @@ func setNVKEClusterConditions(cluster *internalv1.NVKECluster) error {
 	return nil
 }
 
-func pausedDockerMachineTemplate() map[string]any {
+func dockerMachineTemplate() map[string]any {
 	return map[string]any{
 		"apiVersion": "infrastructure.cluster.x-k8s.io/v1beta2",
 		"kind":       "DockerMachineTemplate",
 		"spec": map[string]any{
 			"template": map[string]any{
-				"metadata": map[string]any{"annotations": map[string]any{clusterv1.PausedAnnotation: "true"}},
-				"spec":     map[string]any{},
+				"metadata": map[string]any{},
+				"spec": map[string]any{
+					"customImage": "cwe-capd-kindest-node:local",
+					"extraMounts": []any{
+						map[string]any{
+							"containerPath": "/var/run/docker.sock",
+							"hostPath":      "/var/run/docker.sock",
+						},
+					},
+				},
 			},
 		},
 	}
@@ -711,7 +713,13 @@ func resolveControllerClass(class internalv1.ResourceName, request *api.CreateCl
 	request.ControlPlaneConfig = &api.CreateClusterControlPlaneConfig{
 		DesiredCount:                1,
 		ProvisioningMonitorDisabled: new(true),
-		Infra:                       &api.InfraControlPlaneProvider{MachineTemplate: pausedDockerMachineTemplate()},
+		Infra: &api.InfraControlPlaneProvider{
+			MachineTemplate: dockerMachineTemplate(),
+			PreKubeadmCommands: []string{
+				"mkdir -p /run/cluster-api",
+				"echo success > /run/cluster-api/bootstrap-success.complete",
+			},
+		},
 	}
 	return nil
 }

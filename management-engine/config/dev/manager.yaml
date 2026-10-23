@@ -32,7 +32,7 @@ spec:
         - --leader-election-namespace=$(POD_NAMESPACE)
         - --health-probe-bind-address=:8081
         - --metrics-bind-address=:8443
-        - --infra-template-configmap=infra-templates
+        - --infra-template-configmap=management-engine-infra-templates
         - --nvke-controller-endpoint=http://nke-controller.nke-controller.svc.cluster.local:8080/api
         - --nvke-controller-token-file=/var/run/secrets/nvke-controller/token
         - --zap-log-level=debug

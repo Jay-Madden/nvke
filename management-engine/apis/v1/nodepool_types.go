@@ -33,11 +33,6 @@ type NodePool struct {
 	// +kubebuilder:validation:Format=uuid
 	// +kubebuilder:validation:MaxLength=36
 	VPCPrefixID string `json:"vpcPrefixID,omitempty"`
-	// SSHKeyGroupID selects the SSH key group allowed to access this pool's nodes.
-	// +optional
-	// +kubebuilder:validation:Format=uuid
-	// +kubebuilder:validation:MaxLength=36
-	SSHKeyGroupID string `json:"sshKeyGroupID,omitempty"`
 }
 
 // Rollout configures how changes are applied to nodes.

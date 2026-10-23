@@ -420,12 +420,6 @@ spec:
                       required:
                       - strategy
                       type: object
-                    sshKeyGroupID:
-                      description: SSHKeyGroupID selects the SSH key group allowed
-                        to access this pool's nodes.
-                      format: uuid
-                      maxLength: 36
-                      type: string
                     userParams:
                       description: UserParams configures labels and taints for the
                         pool's nodes.
@@ -542,11 +536,6 @@ spec:
                 required:
                 - channel
                 type: object
-              siteID:
-                description: SiteID identifies the infrastructure site for this cluster.
-                format: uuid
-                maxLength: 36
-                type: string
             required:
             - apiServerAccess
             - clusterNetwork
