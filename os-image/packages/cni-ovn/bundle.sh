@@ -35,7 +35,7 @@ IMAGE_REPO="localhost/nvke/ovnkube"
 # registry override swaps the host and keeps the rest (ovnImageRepository).
 IMAGE_PREFIX="${IMAGE_REPO%/*}"
 # Base images are pinned by index digest, so a moved tag cannot change the build.
-BUILDER_IMAGE="${OVN_BUILDER_IMAGE:-quay.io/projectquay/golang:1.26@sha256:506a668eb4c763a964ffc4d4ad0125d45d75aac899392be7e5d39380f8452564}"
+BUILDER_IMAGE="${OVN_BUILDER_IMAGE:-quay.io/projectquay/golang:1.26@sha256:d5acf07940fb5e6e2d07542abd853cece623d95ffd364769ec825aab5471d3b8}"
 UBUNTU_BASE_IMAGE="${OVN_UBUNTU_BASE_IMAGE:-docker.io/library/ubuntu:26.04@sha256:f144425ff09be612d6d9ad965196e9cdc23dae1f42110a8a11a3e9a8198759f7}"
 
 command -v git >/dev/null 2>&1 || die "git is required to fetch the ${REPO} source"

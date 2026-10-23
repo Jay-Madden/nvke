@@ -172,6 +172,10 @@ KIND_NODE_IMAGE ?= kindest/node:v1.36.1@sha256:3489c7674813ba5d8b1a9977baea8a6e5
 TILT_PORT ?= 10351
 export DEV_NAME KIND_NODE_IMAGE TILT_PORT
 
+.PHONY: tilt-up
+tilt-up: ## Start the controller Tilt stack with providers selected in controller/tilt_config.json.
+	cd ../controller && tilt up --port "$(TILT_PORT)"
+
 .PHONY: dev-up dev dev-sync dev-refresh dev-down test-install
 dev-up: ## Create or reuse the named development environment and prepare credentials.
 	bash hack/dev.sh up
