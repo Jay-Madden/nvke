@@ -167,35 +167,12 @@ require-host-context:
 require-state-context:
 	@test -n "$(STATE_CONTEXT)" || { echo 'Set STATE_CONTEXT to the datastore cluster'; exit 1; }
 
-DEV_NAME ?= nvke
-KIND_NODE_IMAGE ?= kindest/node:v1.36.1@sha256:3489c7674813ba5d8b1a9977baea8a6e553784dab7b84759d1014dbd78f7ebd5
 TILT_PORT ?= 10351
-export DEV_NAME KIND_NODE_IMAGE TILT_PORT
+export TILT_PORT
 
 .PHONY: tilt-up
 tilt-up: ## Start the controller Tilt stack with providers selected in controller/tilt_config.json.
 	cd ../controller && tilt up --port "$(TILT_PORT)"
-
-.PHONY: dev-up dev dev-sync dev-refresh dev-down test-install
-dev-up: ## Create or reuse the named development environment and prepare credentials.
-	bash hack/dev.sh up
-
-dev: ## Check Tilt, prepare or reuse the development clusters, then start Tilt.
-	bash hack/dev.sh check
-	$(MAKE) dev-up
-	bash hack/dev.sh tilt
-
-dev-sync: ## Update datastore CRDs and RBAC without refreshing credentials.
-	bash hack/dev.sh sync
-
-dev-refresh: ## Renew datastore credentials and report their expiration.
-	bash hack/dev.sh refresh
-
-dev-down: ## Delete this environment's clusters and local credentials; stop Tilt first.
-	bash hack/dev.sh down
-
-test-install: ## Test the runtime in the prepared environment; run before Tilt.
-	IMG="$(IMG)" bash hack/dev.sh test
 
 .PHONY: install install-state
 install: install-state ## Install the datastore resources using STATE_CONTEXT.
@@ -220,7 +197,6 @@ $(LOCALBIN):
 
 ## Tool Binaries
 KUBECTL ?= kubectl
-KIND ?= $(LOCALBIN)/kind
 KUSTOMIZE ?= $(LOCALBIN)/kustomize
 KUBEBUILDER ?= $(LOCALBIN)/kubebuilder
 CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
@@ -245,13 +221,6 @@ GOLANGCI_LINT_VERSION ?= v2.14.0
 # pins above so the ones derived from go.mod keep their values.
 include ../make/tool-versions.mk
 include ../make/coverage.mk
-
-.PHONY: kind
-kind: $(LOCALBIN) ## Install the pinned Kind CLI for the development environment.
-	$(call go-install-tool,$(KIND),sigs.k8s.io/kind,$(KIND_VERSION))
-
-dev-up dev dev-sync dev-refresh dev-down test-install dev-nvke-controller dev-nvke-controller-up dev-nvke-controller-down test-nvke-controller-integration: kind
-dev-up dev dev-sync dev-refresh dev-down test-install dev-nvke-controller dev-nvke-controller-up dev-nvke-controller-down test-nvke-controller-integration: export PATH := $(LOCALBIN):$(PATH)
 
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.
