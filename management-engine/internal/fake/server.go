@@ -78,6 +78,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/nodePools/{nodePoolID}", handle(s, &s.nodePools, s.getNodePool))
 	mux.HandleFunc("POST /api/nodePools", handle(s, &s.nodePools, s.createNodePool))
 	mux.HandleFunc("PATCH /api/nodePools/{nodePoolID}", handle(s, &s.nodePools, s.updateNodePool))
+	mux.HandleFunc("DELETE /api/nodePools/{nodePoolID}", handle(s, &s.nodePools, s.deleteNodePool))
 	return mux
 }
 
@@ -346,6 +347,22 @@ func (s *Server) updateNodePool(w http.ResponseWriter, r *http.Request) {
 	pool.DesiredNodeCount = *request.DesiredNodeCount
 	s.nodePools.Resources[id] = pool
 	writeJSON(w, http.StatusOK, pool)
+}
+
+func (s *Server) deleteNodePool(w http.ResponseWriter, r *http.Request) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.requests = append(s.requests, requestRecord{Method: r.Method, Path: r.URL.Path})
+	id, err := uuid.Parse(r.PathValue("nodePoolID"))
+	pool, exists := s.nodePools.Resources[id]
+	if err != nil || !exists {
+		writeError(w, http.StatusNotFound, "node pool not found")
+		return
+	}
+	// Accepted deletion stays pending; completed deletion is seeded as an absent pool.
+	pool.Conditions.Deleting.Status = api.ConditionStatus("True")
+	s.nodePools.Resources[id] = pool
+	w.WriteHeader(http.StatusAccepted)
 }
 
 func (s *Server) deleteCluster(w http.ResponseWriter, r *http.Request) {
