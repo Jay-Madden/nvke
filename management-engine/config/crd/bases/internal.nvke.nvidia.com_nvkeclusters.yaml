@@ -698,6 +698,12 @@ spec:
                 x-kubernetes-list-map-keys:
                 - name
                 x-kubernetes-list-type: map
+              observedGeneration:
+                description: ObservedGeneration is the latest generation observed
+                  by the controller.
+                format: int64
+                minimum: 1
+                type: integer
               resolvedRelease:
                 description: ResolvedRelease identifies the control-plane release
                   selected for this cluster.

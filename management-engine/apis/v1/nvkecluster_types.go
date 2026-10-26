@@ -145,6 +145,10 @@ type NVKEClusterStatus struct {
 	// +optional
 	// +kubebuilder:validation:Format=uuid
 	ID string `json:"id,omitempty"`
+	// ObservedGeneration is the latest generation observed by the controller.
+	// +optional
+	// +kubebuilder:validation:Minimum=1
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 }
 
 // NVKECluster manages a Kubernetes control plane and its node pools as one cluster.

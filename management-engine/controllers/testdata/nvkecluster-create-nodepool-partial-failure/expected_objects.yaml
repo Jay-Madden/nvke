@@ -187,4 +187,5 @@ items:
         type: NVKEControllerProvisioning
       id: dddddddd-dddd-4ddd-8ddd-dddddddddddd
       name: workers-c
+    observedGeneration: 1
 metadata: {}

@@ -131,4 +131,5 @@ items:
         type: NVKEControllerProvisioning
       id: bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb
       name: workers
+    observedGeneration: 1
 metadata: {}

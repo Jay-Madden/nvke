@@ -22,6 +22,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	"sigs.k8s.io/cluster-api/util/conditions"
+	"sigs.k8s.io/cluster-api/util/finalizers"
 	"sigs.k8s.io/cluster-api/util/patch"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -73,15 +74,33 @@ func (r *NVKEClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
+	if r.NVKEController != nil {
+		// Persist cleanup responsibility before making any provisioning request.
+		added, err := finalizers.EnsureFinalizer(ctx, r.Client, &cluster, nvkeClusterFinalizer)
+		if err != nil {
+			return ctrl.Result{}, fmt.Errorf("ensure nvkecluster finalizer: %w", err)
+		}
+		if added {
+			return ctrl.Result{}, nil
+		}
+	}
+
 	patchHelper, err := patch.NewHelper(&cluster, r.Client)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("create nvkecluster patch helper: %w", err)
 	}
+	// Persist status on every return after this point.
 	defer func() {
 		if conditionErr := setNVKEClusterConditions(&cluster); conditionErr != nil {
 			retErr = errors.Join(retErr, conditionErr)
 		}
-		if patchErr := patchHelper.Patch(ctx, &cluster, patch.WithOwnedConditions{Conditions: nvkeClusterOwnedConditions}); client.IgnoreNotFound(patchErr) != nil {
+
+		patchOpts := []patch.Option{patch.WithOwnedConditions{Conditions: nvkeClusterOwnedConditions}}
+		if retErr == nil && r.NVKEController != nil {
+			// Persist the checkpoint with the remaining status
+			patchOpts = append(patchOpts, patch.WithStatusObservedGeneration{})
+		}
+		if patchErr := patchHelper.Patch(ctx, &cluster, patchOpts...); client.IgnoreNotFound(patchErr) != nil {
 			retErr = errors.Join(retErr, fmt.Errorf("patch nvkecluster: %w", patchErr))
 		}
 	}()
@@ -92,11 +111,6 @@ func (r *NVKEClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}
 	if !cluster.DeletionTimestamp.IsZero() {
 		return r.reconcileDelete(ctx, &cluster)
-	}
-	if !controllerutil.ContainsFinalizer(&cluster, nvkeClusterFinalizer) {
-		// Persist cleanup responsibility before making any provisioning request.
-		controllerutil.AddFinalizer(&cluster, nvkeClusterFinalizer)
-		return ctrl.Result{}, nil
 	}
 	return r.reconcileCluster(ctx, &cluster)
 }
