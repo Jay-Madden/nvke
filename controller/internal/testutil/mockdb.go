@@ -323,6 +323,10 @@ func (m *MockTx) UpdateClusterNextCertRenewalDue(ctx context.Context, clusterID 
 	return args.Error(0)
 }
 
+func (m *MockTx) UpdateClusterConditions(ctx context.Context, cluster *db.Cluster) error {
+	return m.Called(ctx, cluster).Error(0)
+}
+
 func (m *MockTx) SyncClusterControlPlaneConfigFromCPNodePools(ctx context.Context, clusterID uuid.UUID) error {
 	args := m.Called(ctx, clusterID)
 	return args.Error(0)
@@ -498,6 +502,10 @@ func (m *MockTx) GetNodeForUpdate(ctx context.Context, id uuid.UUID) (db.Node, e
 		return db.Node{}, args.Error(1)
 	}
 	return v, args.Error(1)
+}
+
+func (m *MockTx) UpdateNodeCertificateInspection(ctx context.Context, node *db.Node) error {
+	return m.Called(ctx, node).Error(0)
 }
 
 func (m *MockTx) UpdateNode(ctx context.Context, node *db.Node) (db.Node, error) {
