@@ -17,6 +17,14 @@ rules:
 - apiGroups:
   - internal.nvke.nvidia.com
   resources:
+  - controlplaneclasses
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - internal.nvke.nvidia.com
+  resources:
   - nvkeclusters
   verbs:
   - get

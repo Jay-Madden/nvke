@@ -40,6 +40,21 @@ data:
     }
 ---
 apiVersion: internal.nvke.nvidia.com/v1
+kind: ControlPlaneClass
+metadata:
+  name: standard
+spec:
+  controlPlane:
+    replicas: 1
+    instanceTypePreferences: [docker]
+    systemReservedMemory: 1Gi
+  rollout:
+    strategy:
+      type: RollingUpdate
+      rollingUpdate:
+        maxSurge: 1
+---
+apiVersion: internal.nvke.nvidia.com/v1
 kind: NVKECluster
 metadata:
   name: cluster-1

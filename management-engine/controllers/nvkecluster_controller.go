@@ -63,6 +63,7 @@ type NVKEClusterReconciler struct {
 
 // +kubebuilder:rbac:groups=internal.nvke.nvidia.com,resources=nvkeclusters,verbs=get;list;watch;patch
 // +kubebuilder:rbac:groups=internal.nvke.nvidia.com,resources=nvkeclusters/status,verbs=update;patch
+// +kubebuilder:rbac:groups=internal.nvke.nvidia.com,resources=controlplaneclasses,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch
 
 func (r *NVKEClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ctrl.Result, retErr error) {
@@ -345,7 +346,7 @@ func (r *NVKEClusterReconciler) ensureCluster(ctx context.Context, cluster *inte
 		return nil, fmt.Errorf("find nvke controller cluster %q: %w", name, err)
 	}
 
-	request, err := resolveNVKEControllerRequest(cluster)
+	request, err := r.resolveNVKEControllerRequest(ctx, cluster)
 	if err != nil {
 		conditions.Set(cluster, metav1.Condition{
 			Type:    internalv1.ClusterReconciledCondition,
@@ -413,31 +414,34 @@ type InvalidSpecError struct{ Message string }
 
 func (e *InvalidSpecError) Error() string { return e.Message }
 
-// resolveNVKEControllerRequest translates supported cluster intent using the temporary hardcoded class configuration.
-func resolveNVKEControllerRequest(cluster *internalv1.NVKECluster) (api.CreateClusterRequest, error) {
+func (r *NVKEClusterReconciler) resolveNVKEControllerRequest(ctx context.Context, cluster *internalv1.NVKECluster) (api.CreateClusterRequest, error) {
 	var empty api.CreateClusterRequest
 	if err := validateNVKEControllerSpec(cluster); err != nil {
 		return empty, fmt.Errorf("validate cluster spec: %w", err)
 	}
+
 	var request api.CreateClusterRequest
-	if err := resolveNVKEControllerClass(cluster.Spec.ControlPlaneClass, &request); err != nil {
-		return empty, fmt.Errorf("resolve control-plane class: %w", err)
-	}
 	request.Name = ClusterRemoteName(cluster)
 	if cluster.UID == "" {
 		return empty, invalidNVKEControllerRequest("A persisted cluster UID is required before provisioning")
 	}
+
 	request.CniPlugin = api.CreateClusterRequestCniPluginOvnKubernetes
 	request.EtcdEncrypted = true
 	pod, err := nvkeControllerNetworkPrefix(cluster.Spec.ClusterNetwork.Pods.CIDRBlocks)
 	if err != nil {
 		return empty, fmt.Errorf("resolve pod network: %w", err)
 	}
+
 	service, err := nvkeControllerNetworkPrefix(cluster.Spec.ClusterNetwork.Services.CIDRBlocks)
 	if err != nil {
 		return empty, fmt.Errorf("resolve service network: %w", err)
 	}
+
 	request.Network = &api.ClusterNetworkCreateConfig{PodCIDR: pod, ServiceCIDR: service}
+	if err := r.resolveNVKEControllerClass(ctx, cluster.Spec.ControlPlaneClass, &request); err != nil {
+		return empty, fmt.Errorf("resolve control-plane class: %w", err)
+	}
 	return request, nil
 }
 
@@ -732,13 +736,19 @@ func dockerMachineTemplate() map[string]any {
 	}
 }
 
-//nolint:unparam // Preserve the error contract while class resolution is hardcoded.
-func resolveNVKEControllerClass(class internalv1.ResourceName, request *api.CreateClusterRequest) error {
-	_ = class
+func (r *NVKEClusterReconciler) resolveNVKEControllerClass(ctx context.Context, name internalv1.ResourceName, request *api.CreateClusterRequest) error {
+	var class internalv1.ControlPlaneClass
+	if err := r.Get(ctx, client.ObjectKey{Name: string(name)}, &class); err != nil {
+		return fmt.Errorf("get ControlPlaneClass %q: %w", name, err)
+	}
+	config := class.Spec.ControlPlane
+	if config.Replicas == nil || *config.Replicas < 1 {
+		return invalidNVKEControllerRequest(fmt.Sprintf("ControlPlaneClass %q must specify at least one replica", name))
+	}
 	request.ControlPlaneKubernetesVersion = "1.36.1"
 	request.ControlPlaneConfig = &api.CreateClusterControlPlaneConfig{
-		DesiredCount:                1,
-		ProvisioningMonitorDisabled: new(true),
+		DesiredCount:                int(*config.Replicas),
+		ProvisioningMonitorDisabled: new(false),
 		Infra: &api.InfraControlPlaneProvider{
 			MachineTemplate: dockerMachineTemplate(),
 			PreKubeadmCommands: []string{
@@ -746,7 +756,8 @@ func resolveNVKEControllerClass(class internalv1.ResourceName, request *api.Crea
 				"echo success > /run/cluster-api/bootstrap-success.complete",
 			},
 		},
-		SystemReservedMemory: "1Gi",
+		MaxSurge:             new(int(class.Spec.Rollout.Strategy.RollingUpdate.MaxSurge)),
+		SystemReservedMemory: config.SystemReservedMemory,
 	}
 	return nil
 }

@@ -16,7 +16,7 @@ clusters:
       status: "True"
   controlPlaneConfig:
     configurationId: 00000000-0000-0000-0000-000000000000
-    desiredCount: 1
+    desiredCount: 3
     infra:
       machineTemplate:
         apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
@@ -32,8 +32,9 @@ clusters:
       preKubeadmCommands:
       - mkdir -p /run/cluster-api
       - echo success > /run/cluster-api/bootstrap-success.complete
-    provisioningMonitorDisabled: true
-    systemReservedMemory: 1Gi
+    maxSurge: 0
+    provisioningMonitorDisabled: false
+    systemReservedMemory: 4Gi
   controlPlaneKubernetesVersion: 1.36.1
   createdAt: "0001-01-01T00:00:00Z"
   etcdEncrypted: true
@@ -96,7 +97,7 @@ requests:
 - create:
     cniPlugin: ovn-kubernetes
     controlPlaneConfig:
-      desiredCount: 1
+      desiredCount: 3
       infra:
         machineTemplate:
           apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
@@ -112,8 +113,9 @@ requests:
         preKubeadmCommands:
         - mkdir -p /run/cluster-api
         - echo success > /run/cluster-api/bootstrap-success.complete
-      provisioningMonitorDisabled: true
-      systemReservedMemory: 1Gi
+      maxSurge: 0
+      provisioningMonitorDisabled: false
+      systemReservedMemory: 4Gi
     controlPlaneKubernetesVersion: 1.36.1
     etcdEncrypted: true
     infra:
