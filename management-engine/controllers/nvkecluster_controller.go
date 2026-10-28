@@ -66,7 +66,7 @@ type NVKEClusterReconciler struct {
 
 // +kubebuilder:rbac:groups=internal.nvke.nvidia.com,resources=nvkeclusters,verbs=get;list;watch;patch
 // +kubebuilder:rbac:groups=internal.nvke.nvidia.com,resources=nvkeclusters/status,verbs=update;patch
-// +kubebuilder:rbac:groups=internal.nvke.nvidia.com,resources=controlplaneclasses;clusterreleases;clusterreleasechannels,verbs=get;list;watch
+// +kubebuilder:rbac:groups=internal.nvke.nvidia.com,resources=controlplaneclasses;clusterreleases;clusterreleasechannels;machineimages,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch
 
 func (r *NVKEClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ctrl.Result, retErr error) {
@@ -244,6 +244,11 @@ func (r *NVKEClusterReconciler) resolveReleaseTemplateVariables(ctx context.Cont
 	if err != nil {
 		return nil, err
 	}
+	var image internalv1.MachineImage
+	imageName := string(release.Spec.MachineImageRef.Name)
+	if err := r.Get(ctx, client.ObjectKey{Name: imageName}, &image); err != nil {
+		return nil, fmt.Errorf("get MachineImage %q for ClusterRelease %q: %w", imageName, release.Name, err)
+	}
 	kubernetesVersion, err := clusterReleaseKubernetesVersion(release)
 	if err != nil {
 		return nil, err
@@ -262,12 +267,18 @@ func (r *NVKEClusterReconciler) resolveReleaseTemplateVariables(ctx context.Cont
 	if err != nil {
 		return nil, fmt.Errorf("marshal release pre-kubeadm commands: %w", err)
 	}
+	// JSON encoding preserves the script's newlines and quotes inside the infra template.
+	ipxeScript, err := json.Marshal(image.Spec.NICo.IPXEScript)
+	if err != nil {
+		return nil, fmt.Errorf("marshal image iPXE script: %w", err)
+	}
 	cluster.Status.ResolvedRelease = &internalv1.ReleaseReference{
 		Name: internalv1.ResourceName(release.Name), Version: kubernetesVersion.String(),
 	}
 	return map[string]any{
 		"BootstrapFilesJSON":     string(filesJSON),
 		"PreKubeadmCommandsJSON": string(commandsJSON),
+		"IPXEScript":             string(ipxeScript),
 	}, nil
 }
 
