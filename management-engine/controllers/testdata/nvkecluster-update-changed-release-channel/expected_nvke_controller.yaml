@@ -19,7 +19,7 @@ clusters:
     desiredCount: 1
     infra:
       bootstrapFiles:
-      - content: preview-release
+      - content: pinned-release
         path: /etc/nvke-release
       machineTemplate:
         apiVersion: infrastructure.cluster.x-k8s.io/v1alpha1
@@ -35,7 +35,7 @@ clusters:
                 chain https://images.example.com/nvke/boot.ipxe
               vpcID: 22222222-2222-4222-8222-222222222222
       preKubeadmCommands:
-      - echo preview-release
+      - echo pinned-release
     maxSurge: 1
     provisioningMonitorDisabled: false
     systemReservedMemory: 1Gi
@@ -53,7 +53,54 @@ clusters:
   network:
     podCIDR: 10.244.0.0/16
     serviceCIDR: 10.96.0.0/12
-nodePools: []
+nodePools:
+- autoModeDisabled: false
+  autoProvisionDisabled: false
+  clusterID: aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa
+  conditions:
+    deleting:
+      lastTransitionTime: "0001-01-01T00:00:00Z"
+      message: ""
+      status: "False"
+    provisioned:
+      lastTransitionTime: "0001-01-01T00:00:00Z"
+      message: ""
+      status: "True"
+    provisioning:
+      lastTransitionTime: "0001-01-01T00:00:00Z"
+      message: ""
+      status: "False"
+  controlPlane: false
+  currentNodeSetID: null
+  desiredNodeCount: 1
+  id: bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb
+  infra:
+    bootstrapFiles:
+    - content: preview-release
+      path: /etc/nvke-release
+    machineTemplate:
+      apiVersion: infrastructure.cluster.x-k8s.io/v1alpha1
+      kind: NicoMachineTemplate
+      spec:
+        template:
+          spec:
+            instanceTypeID: 33333333-3333-4333-8333-333333333333
+            interfaces:
+            - subnetID: 44444444-4444-4444-8444-444444444444
+            ipxeScript: |-
+              #!ipxe
+              chain https://images.example.com/nvke/boot.ipxe
+            vpcID: 22222222-2222-4222-8222-222222222222
+    preKubeadmCommands:
+    - echo preview-release
+  kubernetesVersion: ""
+  name: workers
+  nodeLabels: null
+  nodeNamePrefix: workers
+  nodeTaints: null
+  provisioningMonitorDisabled: true
+  recycleBudget: 0
+  systemReservedMemory: 1Gi
 requests:
 - create:
     cniPlugin: ovn-kubernetes
@@ -61,7 +108,7 @@ requests:
       desiredCount: 1
       infra:
         bootstrapFiles:
-        - content: preview-release
+        - content: pinned-release
           path: /etc/nvke-release
         machineTemplate:
           apiVersion: infrastructure.cluster.x-k8s.io/v1alpha1
@@ -77,7 +124,7 @@ requests:
                   chain https://images.example.com/nvke/boot.ipxe
                 vpcID: 22222222-2222-4222-8222-222222222222
         preKubeadmCommands:
-        - echo preview-release
+        - echo pinned-release
       maxSurge: 1
       provisioningMonitorDisabled: false
       systemReservedMemory: 1Gi
@@ -95,3 +142,31 @@ requests:
       serviceCIDR: 10.96.0.0/12
   method: POST
   path: /api/clusters
+- createNodePool:
+    clusterID: aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa
+    desiredNodeCount: 1
+    infra:
+      bootstrapFiles:
+      - content: preview-release
+        path: /etc/nvke-release
+      machineTemplate:
+        apiVersion: infrastructure.cluster.x-k8s.io/v1alpha1
+        kind: NicoMachineTemplate
+        spec:
+          template:
+            spec:
+              instanceTypeID: 33333333-3333-4333-8333-333333333333
+              interfaces:
+              - subnetID: 44444444-4444-4444-8444-444444444444
+              ipxeScript: |-
+                #!ipxe
+                chain https://images.example.com/nvke/boot.ipxe
+              vpcID: 22222222-2222-4222-8222-222222222222
+      preKubeadmCommands:
+      - echo preview-release
+    name: workers
+    nodeNamePrefix: workers
+    provisioningMonitorDisabled: true
+    systemReservedMemory: 1Gi
+  method: POST
+  path: /api/nodePools
