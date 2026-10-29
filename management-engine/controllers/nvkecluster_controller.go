@@ -29,6 +29,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/dsx-ai-factory/nvke/controller/api"
 	internalv1 "github.com/dsx-ai-factory/nvke/management-engine/apis/v1"
@@ -96,6 +97,10 @@ func (r *NVKEClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	// Persist status on every return after this point.
 	defer func() {
 		if conditionErr := setNVKEClusterConditions(&cluster); conditionErr != nil {
+			// If we have a terminal error but the set failed remove the terminal condition so we requeue
+			for errors.Is(retErr, reconcile.TerminalError(nil)) {
+				retErr = errors.Unwrap(retErr)
+			}
 			retErr = errors.Join(retErr, conditionErr)
 		}
 
@@ -105,6 +110,10 @@ func (r *NVKEClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 			patchOpts = append(patchOpts, patch.WithStatusObservedGeneration{})
 		}
 		if patchErr := patchHelper.Patch(ctx, &cluster, patchOpts...); client.IgnoreNotFound(patchErr) != nil {
+			// If we have a terminal error but the set failed remove the terminal condition so we requeue
+			for errors.Is(retErr, reconcile.TerminalError(nil)) {
+				retErr = errors.Unwrap(retErr)
+			}
 			retErr = errors.Join(retErr, fmt.Errorf("patch nvkecluster: %w", patchErr))
 		}
 	}()
@@ -283,15 +292,21 @@ func (r *NVKEClusterReconciler) resolveReleaseTemplateVariables(ctx context.Cont
 }
 
 func (r *NVKEClusterReconciler) resolveClusterRelease(ctx context.Context, cluster *internalv1.NVKECluster) (*internalv1.ClusterRelease, error) {
+	selection := cluster.Spec.Release.Channel
 	if pinned := cluster.Status.ResolvedRelease; pinned != nil {
-		var release internalv1.ClusterRelease
-		if err := r.Get(ctx, client.ObjectKey{Name: string(pinned.Name)}, &release); err != nil {
-			return nil, fmt.Errorf("get pinned ClusterRelease %q: %w", pinned.Name, err)
+		pinnedVersion, err := version.ParseSemantic(pinned.Version)
+		if err != nil {
+			return nil, fmt.Errorf("parse pinned release version %q: %w", pinned.Version, err)
 		}
-		return &release, nil
+		if selection.Version == "" || selection.Version == fmt.Sprintf("%d.%d", pinnedVersion.Major(), pinnedVersion.Minor()) {
+			var release internalv1.ClusterRelease
+			if err := r.Get(ctx, client.ObjectKey{Name: string(pinned.Name)}, &release); err != nil {
+				return nil, fmt.Errorf("get pinned ClusterRelease %q: %w", pinned.Name, err)
+			}
+			return &release, nil
+		}
 	}
 
-	selection := cluster.Spec.Release.Channel
 	var channel internalv1.ClusterReleaseChannel
 	if err := r.Get(ctx, client.ObjectKey{Name: string(selection.Name)}, &channel); err != nil {
 		return nil, fmt.Errorf("get ClusterReleaseChannel %q: %w", selection.Name, err)
@@ -474,6 +489,9 @@ func (r *NVKEClusterReconciler) ensureCluster(ctx context.Context, cluster *inte
 			Reason:  internalv1.ReconcileFailedReason,
 			Message: err.Error(),
 		})
+		if _, ok := errors.AsType[*InvalidSpecError](err); ok {
+			err = reconcile.TerminalError(err)
+		}
 		return nil, fmt.Errorf("resolve controller request: %w", err)
 	}
 	request.Infra = infra
@@ -868,12 +886,16 @@ func (r *NVKEClusterReconciler) resolveNVKEControllerClass(ctx context.Context, 
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *NVKEClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *NVKEClusterReconciler) SetupWithManager(mgr ctrl.Manager, wrappers ...func(reconcile.Reconciler) reconcile.Reconciler) error {
 	if r.PollInterval <= 0 {
 		r.PollInterval = defaultPollInterval
+	}
+	var reconciler reconcile.Reconciler = r
+	for _, wrap := range wrappers {
+		reconciler = wrap(reconciler)
 	}
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&internalv1.NVKECluster{}).
 		Named("nvkecluster").
-		Complete(r)
+		Complete(reconciler)
 }
