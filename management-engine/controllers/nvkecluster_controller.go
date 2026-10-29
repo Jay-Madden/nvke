@@ -293,23 +293,30 @@ func (r *NVKEClusterReconciler) resolveReleaseTemplateVariables(ctx context.Cont
 
 func (r *NVKEClusterReconciler) resolveClusterRelease(ctx context.Context, cluster *internalv1.NVKECluster) (*internalv1.ClusterRelease, error) {
 	selection := cluster.Spec.Release.Channel
+	var channel internalv1.ClusterReleaseChannel
+	if err := r.Get(ctx, client.ObjectKey{Name: string(selection.Name)}, &channel); err != nil {
+		return nil, fmt.Errorf("get ClusterReleaseChannel %q: %w", selection.Name, err)
+	}
 	if pinned := cluster.Status.ResolvedRelease; pinned != nil {
 		pinnedVersion, err := version.ParseSemantic(pinned.Version)
 		if err != nil {
 			return nil, fmt.Errorf("parse pinned release version %q: %w", pinned.Version, err)
 		}
-		if selection.Version == "" || selection.Version == fmt.Sprintf("%d.%d", pinnedVersion.Major(), pinnedVersion.Minor()) {
+		pinnedMinorVersion := fmt.Sprintf("%d.%d", pinnedVersion.Major(), pinnedVersion.Minor())
+		inChannel := false
+		for _, candidate := range channel.Spec.Releases[pinnedMinorVersion] {
+			if candidate.Name == pinned.Name {
+				inChannel = true
+				break
+			}
+		}
+		if inChannel && (selection.Version == "" || selection.Version == pinnedMinorVersion) {
 			var release internalv1.ClusterRelease
 			if err := r.Get(ctx, client.ObjectKey{Name: string(pinned.Name)}, &release); err != nil {
 				return nil, fmt.Errorf("get pinned ClusterRelease %q: %w", pinned.Name, err)
 			}
 			return &release, nil
 		}
-	}
-
-	var channel internalv1.ClusterReleaseChannel
-	if err := r.Get(ctx, client.ObjectKey{Name: string(selection.Name)}, &channel); err != nil {
-		return nil, fmt.Errorf("get ClusterReleaseChannel %q: %w", selection.Name, err)
 	}
 	channelVersion := selection.Version
 	if channelVersion == "" {
