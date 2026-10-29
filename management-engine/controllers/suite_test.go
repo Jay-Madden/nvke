@@ -104,7 +104,16 @@ func controllerCaseSet(description, dirPrefix string, defineSteps func(*fixture.
 			completed[tc] = done
 			defineSteps(tc, set)
 			It("waits for reconciliation to complete", func(ctx SpecContext) {
-				Eventually(done).WithContext(ctx).WithTimeout(timeout).WithPolling(pollInterval).Should(Receive())
+				waitCtx, cancel := context.WithTimeout(ctx, timeout)
+
+				// Block until the current reconcile, if any, completes to ensure all
+				// writes to the object under test have completed
+				defer cancel()
+				select {
+				case <-done:
+				case <-waitCtx.Done():
+					Fail("waiting for reconciliation: " + waitCtx.Err().Error())
+				}
 			})
 		},
 	}
@@ -125,11 +134,14 @@ func setupWithManager(ctx SpecContext, tc *fixture.Case, nvkeControllerClient NV
 	}
 	wrap := func(next reconcile.Reconciler) reconcile.Reconciler {
 		return reconcile.Func(func(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+			// Lock the tests from firing a golden update while a reconcile is underway
 			select {
 			case <-completed:
 			default:
 			}
+
 			result, err := next.Reconcile(ctx, req)
+
 			select {
 			case completed <- struct{}{}:
 			default:
