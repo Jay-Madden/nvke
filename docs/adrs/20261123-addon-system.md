@@ -14,7 +14,7 @@ The primary purpose of this ADR is to define the enablement of that capability.
 We will model this stated problem as a problem of 'data-flow'. The stated capabilites serve as ways to mutate the cluster creation 'data-flow' as it moves through the system. Those mutations form the core of an 'Accelerated Addon'. With the addon "cluster yaml configuration" delivery method currently being specced as using [cluster-api-addon-provider-syscmp](https://github.com/NVIDIA/cluster-api-addon-provider-syscmp).
 
  ```mermaid
-   %%{init: {"theme": "redux-dark-color"}}%%
+   %%{init: {"theme": "redux-dark-color", "look": "handDrawn"}}%%
    flowchart LR
        cluster["NVKECluster"]
        channel["AddonReleaseChannel"]
@@ -51,7 +51,7 @@ Add-on composition follows the same data-flow model as Kustomize components: beg
 NVKE constructs the base desired objects from cluster configuration. Selected AddonReleases act as transformation stages over those objects, using CEL and the NVKECluster as shared context. The resulting objects are then materialized and reconciled.
 
 ```mermaid
-%%{init: {"theme": "redux-dark-color"}}%%
+%%{init: {"theme": "redux-dark-color", "look": "handDrawn"}}%%
 flowchart TB
     subgraph kustomize["Kustomize"]
         direction LR
