@@ -42,6 +42,9 @@ We will model this stated problem as a problem of 'data-flow'. The stated capabi
        bootstrap --> bootstrapOut["Worker host configuration"]
        controlPlane --> controlPlaneOut["Control-plane host configuration"]
        runtime --> runtimeOut["Runtime bundle values"]
+
+       classDef default fill:none;
+       style reconciler fill:none;
  ```
 
 ### Composition as data flow
@@ -69,6 +72,10 @@ flowchart TB
         context["NVKECluster context"] -.-> addonA
         context -.-> addonB
     end
+
+    classDef default fill:none;
+    style kustomize fill:none;
+    style nvke fill:none;
 ```
 
 Within each add-on stage:
