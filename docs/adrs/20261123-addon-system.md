@@ -11,7 +11,7 @@ The primary purpose of this ADR is to define the enablement of that capability.
 
 ## Decision
 
-A single capability can require coordinated configuration across multiple independently reconciled objects. We will express that coordination as transformations of the desired objects during cluster provisioning, using NVKECluster as shared context.
+A single capability can require coordinated configuration across multiple independently reconciled objects. We will express that coordination as transformations of the desired objects during cluster provisioning, using NVKECluster as shared context. These transformations form the core of an Accelerated Addon.
 
 [SysCMP](https://github.com/NVIDIA/cluster-api-addon-provider-syscmp) will deliver the cluster runtime configuration.
 
