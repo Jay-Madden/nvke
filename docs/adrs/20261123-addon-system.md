@@ -11,7 +11,9 @@ The primary purpose of this ADR is to define the enablement of that capability.
 
 ## Decision
 
-We will model this stated problem as a problem of 'data-flow'. The stated capabilites serve as ways to mutate the cluster creation 'data-flow' as it moves through the system. Those mutations form the core of an 'Accelerated Addon'. With the addon "cluster yaml configuration" delivery method currently being specced as using [cluster-api-addon-provider-syscmp](https://github.com/NVIDIA/cluster-api-addon-provider-syscmp).
+A single capability can require coordinated configuration across multiple independently reconciled objects. We will express that coordination as transformations of the desired objects during cluster provisioning, using NVKECluster as shared context.
+
+[SysCMP](https://github.com/NVIDIA/cluster-api-addon-provider-syscmp) will deliver the cluster runtime configuration.
 
  ```mermaid
    %%{init: {"theme": "redux-dark-color", "look": "handDrawn"}}%%
