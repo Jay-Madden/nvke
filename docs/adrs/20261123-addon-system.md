@@ -461,7 +461,7 @@ spec:
 
 AICR is one producer of the OCI bundles consumed by this system. The operator resolves an AICR recipe, builds an `argocd-helm` bundle, and publishes its digest through an out-of-band SystemPackage. NVKE selects that package through an AddonRelease.
 
-> [!NOTEJ]
+> [!NOTE]
 > It does not resolve recipes or generate bundles during cluster reconciliation.
 
 **Ownership Boundaries**
